@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getProvider } from "@/lib/tracking/registry";
 import { hashToken, looksLikeDeviceToken } from "@/lib/tracking/tokens";
-import type { DeviceContext } from "@/lib/tracking/types";
+import type { DeviceContext, TrackingProvider } from "@/lib/tracking/types";
 import { ingestRecords, logRejectedIngest, requestMeta } from "@/lib/ingest/pipeline";
 
 export const runtime = "nodejs";
@@ -15,11 +15,41 @@ const DEVICE_RATE = { limit: 240, windowS: 60 }; // 4 req/s sustained per device
 const USER_RATE = { limit: 120, windowS: 60 };
 
 /**
+ * Reads the body as JSON or form-encoded (Traccar Client posts forms) and merges query parameters underneath,
+ * so OsmAnd-style clients that put everything in the URL work too. Returns null for unparseable bodies.
+ */
+function readBody(req: NextRequest, raw: string): Record<string, unknown> | unknown[] | null {
+  const query = Object.fromEntries(req.nextUrl.searchParams.entries());
+  const type = (req.headers.get("content-type") ?? "").toLowerCase();
+  const trimmed = raw.trim();
+  if (trimmed === "") return query;
+  const asForm = () => ({ ...query, ...Object.fromEntries(new URLSearchParams(trimmed).entries()) });
+  if (type.includes("application/x-www-form-urlencoded")) return asForm();
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (Array.isArray(parsed)) return parsed;
+    return parsed && typeof parsed === "object" ? { ...query, ...(parsed as Record<string, unknown>) } : null;
+  } catch {
+    return type.includes("json") ? null : asForm();
+  }
+}
+
+function bearer(req: Request): string | null {
+  const auth = req.headers.get("authorization") ?? "";
+  return auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+}
+
+function ok(provider: TrackingProvider, results: unknown, extra: Record<string, unknown> = {}) {
+  return NextResponse.json(provider.successBody !== undefined ? provider.successBody : { results, ...extra });
+}
+
+/**
  * POST /api/ingest/[provider]
- * Push providers authenticate with a per-device bearer token (`awd_...`).
+ * Push providers authenticate with a per-device token (`awd_...`): a Bearer header by default, or wherever the
+ * provider's tokenFrom() says (phone apps that cannot set headers).
  * Client-reported/manual providers authenticate with the user's session and pass `assetId`.
- * Returns 200 with per-record outcomes for anything the DB decided (accepted/duplicate/out_of_order/rejected)
- * so upstream webhooks do not retry forever; 4xx only for auth/format problems; 5xx for real failures.
+ * Returns 200 for anything the DB decided (accepted/duplicate/out_of_order/rejected) so clients do not retry forever;
+ * 4xx for auth/format problems (except providers that acknowledge invalid payloads); 5xx for real failures.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const { provider: providerKey } = await params;
@@ -33,12 +63,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pro
   const raw = await req.text();
   if (raw.length > MAX_BODY_BYTES) return NextResponse.json({ error: "payload_too_large" }, { status: 413 });
 
-  let body: unknown;
-  try {
-    body = JSON.parse(raw);
-  } catch {
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
-  }
+  const body = readBody(req, raw);
+  if (body === null) return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+  const fields: Record<string, unknown> = Array.isArray(body) ? {} : body;
+  const redacted = (b: unknown) => (provider.redact && b && typeof b === "object" && !Array.isArray(b) ? provider.redact(b as Record<string, unknown>) : b);
 
   let admin;
   try {
@@ -50,8 +78,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pro
   let rateKey: string;
 
   if (provider.auth === "device_token") {
-    const auth = req.headers.get("authorization") ?? "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+    const token = (provider.tokenFrom ? provider.tokenFrom(req, fields) : bearer(req))?.trim() ?? "";
     if (!looksLikeDeviceToken(token)) {
       await logRejectedIngest(admin, { providerKey: provider.key, reason: "missing_token", ...meta });
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -73,9 +100,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pro
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    const assetId = body && typeof body === "object" && typeof (body as { assetId?: unknown }).assetId === "string"
-      ? (body as { assetId: string }).assetId
-      : null;
+    const assetId = typeof fields.assetId === "string" ? fields.assetId : null;
     if (!assetId) return NextResponse.json({ error: "assetId_required" }, { status: 400 });
     // Ownership check under RLS, then (auto-)provision the device row for this provider.
     const { data: asset } = await supabase.from("assets").select("id, owner_id").eq("id", assetId).maybeSingle();
@@ -112,20 +137,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pro
       ownerId: ctx.ownerId,
       externalDeviceId: ctx.externalDeviceId,
       reason,
-      payload: body,
+      payload: redacted(body),
       ...meta,
     });
+    if (provider.acknowledgeInvalid) return ok(provider, [], { note: "invalid_payload_acknowledged" });
     return NextResponse.json({ error: "invalid_payload", detail: reason }, { status: 422 });
   }
 
   if (parsed.locations.length === 0 && parsed.statuses.length === 0) {
-    return NextResponse.json({ results: [], note: "no_records" });
+    return ok(provider, [], { note: "no_records" });
   }
 
   try {
     const results = await ingestRecords(ctx, parsed.locations, parsed.statuses, meta, admin);
-    const hasError = results.some((r) => r.status === "error");
-    return NextResponse.json({ results }, { status: hasError ? 500 : 200 });
+    if (results.some((r) => r.status === "error")) return NextResponse.json({ results }, { status: 500 });
+    return ok(provider, results);
   } catch (e) {
     return NextResponse.json({ error: "ingest_failed", detail: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }

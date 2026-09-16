@@ -242,7 +242,7 @@ function SettingsTab({ asset, devices, onChanged }: { asset: AssetOverview; devi
                   {d.last_error ? ` · last error: ${d.last_error}` : ""}
                 </p>
               </div>
-              {["simulated", "traccar", "ios_companion", "flespi"].includes(d.provider_key) ? (
+              {["simulated", "traccar", "ios_companion", "flespi", "traccar_client", "owntracks"].includes(d.provider_key) ? (
                 <Button variant="secondary" size="sm" disabled={pending} onClick={() => run(() => rotateDeviceToken(d.id), d.provider_key)}>
                   <RotateCw className="h-3.5 w-3.5" /> Rotate token
                 </Button>

@@ -11,6 +11,8 @@ export type ProviderKey =
   | "ios_companion"
   | "traccar"
   | "flespi"
+  | "traccar_client"
+  | "owntracks"
   | "apple_findmy_reported";
 export type AlertType =
   | "geofence_enter"
