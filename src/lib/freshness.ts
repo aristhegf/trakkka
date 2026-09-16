@@ -44,13 +44,21 @@ export const FRESHNESS_LABEL: Record<Freshness, string> = {
   unknown: "No location",
 };
 
-/** Tailwind colour tokens per freshness state (see globals.css for the CSS variables). */
+/** Marker ring colours, per theme. Keep in sync with the --fresh-* tokens in globals.css. */
 export const FRESHNESS_COLOR: Record<Freshness, string> = {
+  live: "#16a34a",
+  recent: "#d97706",
+  stale: "#ea580c",
+  offline: "#dc2626",
+  unknown: "#8a847a",
+};
+
+export const FRESHNESS_COLOR_DARK: Record<Freshness, string> = {
   live: "#22c55e",
-  recent: "#eab308",
-  stale: "#f97316",
-  offline: "#ef4444",
-  unknown: "#9ca3af",
+  recent: "#f59e0b",
+  stale: "#fb923c",
+  offline: "#f87171",
+  unknown: "#8f897e",
 };
 
 export function thresholdsFrom(row: {

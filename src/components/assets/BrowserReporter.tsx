@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/motion/switch";
+import { Section } from "@/components/kit/page";
 import { relativeTime } from "@/lib/format";
 
 /**
@@ -11,7 +12,8 @@ import { relativeTime } from "@/lib/format";
  */
 export function BrowserReporter({ assetId }: { assetId: string }) {
   const [enabled, setEnabled] = useState(false);
-  const [status, setStatus] = useState<string>("Waiting for a fix…");
+  const [status, setStatus] = useState<string>("Waiting for your position…");
+  const [ok, setOk] = useState(true);
   const [lastSent, setLastSent] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -39,43 +41,49 @@ export function BrowserReporter({ assetId }: { assetId: string }) {
           const res = await fetch("/api/ingest/browser_geolocation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
           if (res.ok) {
             setLastSent(new Date());
-            setStatus(`Reporting (±${Math.round(c.accuracy)} m)`);
+            setOk(true);
+            setStatus(`Sharing, accurate to about ${Math.round(c.accuracy)} m`);
           } else {
-            setStatus(`Server refused (${res.status})`);
+            setOk(false);
+            setStatus(`The server refused the location (${res.status}).`);
           }
         } catch {
-          setStatus("Network error; will retry on the next fix.");
+          setOk(false);
+          setStatus("No connection. Trying again on the next update.");
         }
       },
-      (err) => setStatus(err.code === err.PERMISSION_DENIED ? "Permission denied. Allow location for this site to continue." : `Error: ${err.message}`),
+      (err) => {
+        setOk(false);
+        setStatus(err.code === err.PERMISSION_DENIED ? "Location permission is blocked. Allow it for this site to share." : `Could not get a position: ${err.message}`);
+      },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 },
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, [enabled, assetId]);
 
   const supported = typeof navigator !== "undefined" && "geolocation" in navigator;
-  const shownStatus = !enabled ? "Off" : !supported ? "Geolocation is not available in this browser." : status;
+  const shownStatus = !enabled ? "Off" : !supported ? "Location is not available in this browser." : status;
 
   return (
-    <div className="space-y-2 rounded-lg border border-border bg-surface p-3">
-      <p className="text-sm font-semibold">Report this browser&apos;s location</p>
-      <p className="text-xs text-muted">Works only while Trakkka is open in this tab. Browsers do not allow background location for websites; the iOS companion app is the path for that.</p>
-      <div className="flex items-center gap-3">
-        <Button
-          size="sm"
-          variant={enabled ? "danger" : "primary"}
-          onClick={() => {
-            setStatus("Waiting for a fix…");
-            setEnabled((e) => !e);
+    <Section title="Share this browser's location" description="Works only while Trakkka stays open in this tab. For background tracking use a phone app instead.">
+      <div className="flex items-center justify-between gap-4 rounded-2xl bg-muted/60 px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{enabled ? "Sharing is on" : "Sharing is off"}</p>
+          <p className={enabled && !ok ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
+            {shownStatus}
+            {enabled && lastSent ? ` · sent ${relativeTime(lastSent)}` : ""}
+          </p>
+        </div>
+        <Switch
+          checked={enabled}
+          ariaLabel="Share this browser's location"
+          onCheckedChange={(v) => {
+            setStatus("Waiting for your position…");
+            setOk(true);
+            setEnabled(v);
           }}
-        >
-          {enabled ? "Stop sharing" : "Start sharing"}
-        </Button>
-        <span className="text-xs text-muted">
-          {shownStatus}
-          {enabled && lastSent ? ` · last sent ${relativeTime(lastSent)}` : ""}
-        </span>
+        />
       </div>
-    </div>
+    </Section>
   );
 }

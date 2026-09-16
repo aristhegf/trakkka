@@ -1,25 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Map, {
-  GeolocateControl,
-  Layer,
-  NavigationControl,
-  ScaleControl,
-  Source,
-  type LayerProps,
-  type MapLayerMouseEvent,
-  type MapRef,
-} from "react-map-gl/maplibre";
+import Map, { Layer, NavigationControl, ScaleControl, Source, type LayerProps, type MapLayerMouseEvent, type MapRef } from "react-map-gl/maplibre";
 import type { GeoJSONSource } from "maplibre-gl";
 import "@/lib/map/setup";
-import { Layers, Maximize2, Satellite } from "lucide-react";
+import { Layers, LocateFixed, Maximize2, Satellite } from "lucide-react";
 import type { AssetOverview, AssetType, Freshness, Geofence, HistoryPoint } from "@/lib/types";
 import { DARK_STYLE, DEFAULT_VIEW, LABEL_FONT, LIGHT_STYLE, SATELLITE_AVAILABLE, satelliteStyle } from "@/lib/map/styles";
-import { iconId, registerAssetIcons } from "@/lib/map/icons";
+import { MAP_PALETTE, iconId, registerAssetIcons } from "@/lib/map/icons";
 import { bbox, circlePolygon, lerpLngLat, type LngLat } from "@/lib/geo";
-import { useTheme } from "@/components/shell/ThemeProvider";
-import { cn } from "@/lib/cn";
+import { useResolvedTheme } from "@/components/kit/theme";
+import { Tooltip } from "@/components/motion/tooltip";
+import { cn } from "@/lib/utils";
 
 export interface AssetMapProps {
   assets: AssetOverview[];
@@ -28,12 +20,17 @@ export interface AssetMapProps {
   onSelect?: (id: string | null) => void;
   geofences?: Geofence[];
   trail?: HistoryPoint[] | null;
-  /** When set, the map fits/centres on this asset id whenever it changes. */
+  /** When set, the map centres on this asset id whenever it changes. */
   focusId?: string | null;
   className?: string;
   interactive?: boolean;
-  showControls?: boolean;
+  /** full: zoom buttons + tools (desktop). compact: tools only, pinch to zoom (phones). none: static preview. */
+  controls?: "full" | "compact" | "none";
+  /** Positions the tool column, e.g. to sit above a bottom card on phones. */
+  controlsClassName?: string;
   fitOnLoad?: boolean;
+  /** Extra padding (px) kept clear when fitting, e.g. under floating panels. */
+  fitPadding?: { top?: number; bottom?: number; left?: number; right?: number };
 }
 
 interface Anim {
@@ -45,16 +42,15 @@ interface Anim {
 const ANIM_MS = 900;
 const nowMs = () => performance.now();
 
-/** Eased position of an in-flight animation at time t. */
 function animatedPos(a: Anim, t: number): LngLat {
   const k = Math.min(1, Math.max(0, (t - a.start) / ANIM_MS));
-  const e = 1 - (1 - k) * (1 - k); // ease-out
+  const e = 1 - (1 - k) * (1 - k);
   return lerpLngLat(a.from, a.to, e);
 }
 
 /**
- * The live map. One clustered GeoJSON source for assets, one for accuracy rings, one for geofences,
- * one for the optional trail. Marker positions animate between fixes only when the asset is LIVE.
+ * The live map. One clustered GeoJSON source for assets, one for accuracy circles, one for places, one for the
+ * optional trail. Markers animate between fixes only when the asset is LIVE.
  */
 export function AssetMap({
   assets,
@@ -66,13 +62,18 @@ export function AssetMap({
   focusId = null,
   className,
   interactive = true,
-  showControls = true,
+  controls = "full",
+  controlsClassName,
   fitOnLoad = true,
+  fitPadding,
 }: AssetMapProps) {
   const mapRef = useRef<MapRef | null>(null);
-  const { theme } = useTheme();
+  const theme = useResolvedTheme();
+  const pal = MAP_PALETTE[theme];
   const [satellite, setSatellite] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [me, setMe] = useState<{ lng: number; lat: number; accuracy: number } | null>(null);
+  const [locating, setLocating] = useState(false);
   const fittedRef = useRef(false);
 
   const baseStyle = useMemo(() => {
@@ -82,8 +83,7 @@ export function AssetMap({
 
   const located = useMemo(() => assets.filter((a) => a.latitude != null && a.longitude != null), [assets]);
 
-  // ---- Movement animation. Animations are state; render-time diffing starts them and a rAF loop
-  // (setState only inside its callback) advances and retires them. Only LIVE + moving assets animate.
+  // ---- Movement animation (render-time diff starts animations; a rAF loop advances and retires them).
   const [anims, setAnims] = useState<Record<string, Anim>>({});
   const [, setFrame] = useState(0);
   const [prevLocated, setPrevLocated] = useState(located);
@@ -144,19 +144,16 @@ export function AssetMap({
           properties: {
             id: a.id,
             name: a.name,
-            type: a.type,
-            icon: iconId(a.type as AssetType, f),
-            freshness: f,
+            icon: iconId(a.type as AssetType, f, theme),
             heading: a.heading_deg ?? 0,
-            moving: a.movement_state === "moving" && a.heading_deg != null ? 1 : 0,
+            moving: a.movement_state === "moving" && a.heading_deg != null && (f === "live" || f === "recent") ? 1 : 0,
             selected: a.id === selectedId ? 1 : 0,
             alerts: a.open_alert_count ?? 0,
           },
         };
       }),
     };
-    // `anims` changes on every animation frame (the rAF loop bumps state), which is what re-derives positions.
-  }, [located, freshnessOf, selectedId, anims]);
+  }, [located, freshnessOf, selectedId, anims, theme]);
 
   const accuracyGeoJson = useMemo<GeoJSON.FeatureCollection>(
     () => ({
@@ -166,25 +163,32 @@ export function AssetMap({
         .map((a) => ({
           type: "Feature",
           geometry: circlePolygon({ lng: a.longitude!, lat: a.latitude! }, a.accuracy_m!),
-          properties: { id: a.id, selected: a.id === selectedId ? 1 : 0 },
+          properties: { selected: a.id === selectedId ? 1 : 0 },
         })),
     }),
     [located, selectedId],
   );
 
-  const geofenceGeoJson = useMemo<GeoJSON.FeatureCollection>(
+  const placesGeoJson = useMemo<GeoJSON.FeatureCollection>(
     () => ({
       type: "FeatureCollection",
-      features: geofences
-        .filter((g) => g.is_active)
-        .map((g) => ({
-          type: "Feature",
-          id: g.id,
-          geometry: g.geometry,
-          properties: { id: g.id, name: g.name, color: g.color ?? "#2563eb" },
-        })),
+      features: geofences.filter((g) => g.is_active).map((g) => ({ type: "Feature", id: g.id, geometry: g.geometry, properties: { name: g.name, color: g.color ?? pal.primary } })),
     }),
-    [geofences],
+    [geofences, pal.primary],
+  );
+
+  const meGeoJson = useMemo<GeoJSON.FeatureCollection | null>(
+    () =>
+      me
+        ? {
+            type: "FeatureCollection",
+            features: [
+              { type: "Feature", geometry: circlePolygon(me, Math.max(me.accuracy, 5)), properties: { kind: "area" } },
+              { type: "Feature", geometry: { type: "Point", coordinates: [me.lng, me.lat] }, properties: { kind: "dot" } },
+            ],
+          }
+        : null,
+    [me],
   );
 
   const trailGeoJson = useMemo<GeoJSON.FeatureCollection | null>(() => {
@@ -198,15 +202,32 @@ export function AssetMap({
     };
   }, [trail]);
 
+  const padding = useMemo(() => ({ top: 72 + (fitPadding?.top ?? 0), bottom: 72 + (fitPadding?.bottom ?? 0), left: 56 + (fitPadding?.left ?? 0), right: 56 + (fitPadding?.right ?? 0) }), [fitPadding]);
+
   const fitAll = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
     const pts = located.map((a) => ({ lng: a.longitude!, lat: a.latitude! }));
     const b = bbox(pts);
     if (!b) return;
-    if (pts.length === 1) map.flyTo({ center: [pts[0].lng, pts[0].lat], zoom: 15, duration: 600 });
-    else map.fitBounds(b, { padding: 80, maxZoom: 16, duration: 600 });
-  }, [located]);
+    if (pts.length === 1) map.flyTo({ center: [pts[0].lng, pts[0].lat], zoom: 15, duration: 600, padding });
+    else map.fitBounds(b, { padding, maxZoom: 16, duration: 600 });
+  }, [located, padding]);
+
+  const locateMe = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const next = { lng: pos.coords.longitude, lat: pos.coords.latitude, accuracy: pos.coords.accuracy };
+        setMe(next);
+        setLocating(false);
+        mapRef.current?.flyTo({ center: [next.lng, next.lat], zoom: Math.max(mapRef.current.getZoom(), 15), duration: 700, padding });
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 },
+    );
+  }, [padding]);
 
   useEffect(() => {
     if (loaded && fitOnLoad && !fittedRef.current && located.length > 0) {
@@ -215,32 +236,29 @@ export function AssetMap({
     }
   }, [loaded, fitOnLoad, located.length, fitAll]);
 
-  // Centre on the focused asset when it changes.
   useEffect(() => {
     if (!focusId || !loaded) return;
     const a = located.find((x) => x.id === focusId);
-    if (a) mapRef.current?.flyTo({ center: [a.longitude!, a.latitude!], zoom: Math.max(mapRef.current.getZoom(), 15), duration: 600 });
-  }, [focusId, loaded, located]);
+    if (a) mapRef.current?.flyTo({ center: [a.longitude!, a.latitude!], zoom: Math.max(mapRef.current.getZoom(), 15), duration: 600, padding });
+    // re-centre only when the focus target changes, not on every position update
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, loaded]);
 
-  // Fit to trail when it appears.
   useEffect(() => {
     if (!trail || trail.length < 2 || !loaded) return;
     const b = bbox(trail.map((p) => ({ lng: p.longitude, lat: p.latitude })));
     if (b) mapRef.current?.fitBounds(b, { padding: 60, maxZoom: 16, duration: 600 });
   }, [trail, loaded]);
 
-  const onLoad = useCallback(() => {
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-    registerAssetIcons(map);
-    setLoaded(true);
-  }, []);
-
-  // Style switches drop custom images; re-register them.
-  const onStyleData = useCallback(() => {
+  const register = useCallback(() => {
     const map = mapRef.current?.getMap();
     if (map) registerAssetIcons(map);
   }, []);
+
+  const onLoad = useCallback(() => {
+    register();
+    setLoaded(true);
+  }, [register]);
 
   const onClick = useCallback(
     (e: MapLayerMouseEvent) => {
@@ -266,101 +284,78 @@ export function AssetMap({
     [onSelect],
   );
 
-  const clusterLayer: LayerProps = {
-    id: "clusters",
-    type: "circle",
-    source: "assets",
-    filter: ["has", "point_count"],
-    paint: {
-      "circle-color": theme === "dark" ? "#1f2a40" : "#ffffff",
-      "circle-stroke-color": "#2563eb",
-      "circle-stroke-width": 3,
-      "circle-radius": ["step", ["get", "point_count"], 18, 10, 22, 50, 28],
+  const L: Record<string, LayerProps> = {
+    placeFill: { id: "place-fill", type: "fill", source: "places", paint: { "fill-color": ["get", "color"], "fill-opacity": 0.1 } },
+    placeLine: { id: "place-line", type: "line", source: "places", paint: { "line-color": ["get", "color"], "line-width": 1.5, "line-opacity": 0.8 } },
+    placeLabel: {
+      id: "place-label",
+      type: "symbol",
+      source: "places",
+      layout: { "text-field": ["get", "name"], "text-font": LABEL_FONT, "text-size": 12, "text-letter-spacing": 0.02 },
+      paint: { "text-color": ["get", "color"], "text-halo-color": pal.halo, "text-halo-width": 1.5 },
+    },
+    trailLine: { id: "trail-line", type: "line", source: "trail", filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": pal.primary, "line-width": 4, "line-opacity": 0.85 }, layout: { "line-join": "round", "line-cap": "round" } },
+    trailStart: { id: "trail-start", type: "circle", source: "trail", filter: ["==", ["get", "kind"], "start"], paint: { "circle-radius": 6, "circle-color": pal.paper, "circle-stroke-color": pal.primary, "circle-stroke-width": 3 } },
+    accFill: { id: "accuracy-fill", type: "fill", source: "accuracy", paint: { "fill-color": pal.primary, "fill-opacity": ["case", ["==", ["get", "selected"], 1], 0.14, 0.06] } },
+    accLine: { id: "accuracy-line", type: "line", source: "accuracy", paint: { "line-color": pal.primary, "line-opacity": 0.45, "line-width": 1, "line-dasharray": [2, 2] } },
+    meArea: { id: "me-area", type: "fill", source: "me", filter: ["==", ["get", "kind"], "area"], paint: { "fill-color": "#3b82f6", "fill-opacity": 0.12 } },
+    meDot: { id: "me-dot", type: "circle", source: "me", filter: ["==", ["get", "kind"], "dot"], paint: { "circle-radius": 7, "circle-color": "#3b82f6", "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } },
+    cluster: {
+      id: "clusters",
+      type: "circle",
+      source: "assets",
+      filter: ["has", "point_count"],
+      paint: { "circle-color": pal.ink, "circle-stroke-color": pal.paper, "circle-stroke-width": 3, "circle-radius": ["step", ["get", "point_count"], 20, 10, 24, 50, 30] },
+    },
+    clusterCount: {
+      id: "cluster-count",
+      type: "symbol",
+      source: "assets",
+      filter: ["has", "point_count"],
+      layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": LABEL_FONT, "text-size": 14 },
+      paint: { "text-color": pal.paper },
+    },
+    halo: {
+      id: "asset-selected",
+      type: "circle",
+      source: "assets",
+      filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "selected"], 1]],
+      paint: { "circle-radius": 30, "circle-color": pal.primary, "circle-opacity": 0.18, "circle-stroke-color": pal.primary, "circle-stroke-width": 2 },
+    },
+    arrow: {
+      id: "asset-heading",
+      type: "symbol",
+      source: "assets",
+      filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "moving"], 1]],
+      layout: { "icon-image": `heading-arrow-${theme}`, "icon-size": 0.9, "icon-rotate": ["get", "heading"], "icon-rotation-alignment": "map", "icon-offset": [0, -34], "icon-allow-overlap": true, "icon-ignore-placement": true },
+    },
+    point: {
+      id: "asset-points",
+      type: "symbol",
+      source: "assets",
+      filter: ["!", ["has", "point_count"]],
+      layout: {
+        "icon-image": ["get", "icon"],
+        "icon-size": ["case", ["==", ["get", "selected"], 1], 0.72, 0.58],
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
+        "text-field": ["get", "name"],
+        "text-font": LABEL_FONT,
+        "text-size": 12,
+        "text-offset": [0, 1.7],
+        "text-anchor": "top",
+        "text-optional": true,
+      },
+      paint: { "text-color": pal.ink, "text-halo-color": pal.halo, "text-halo-width": 2 },
+    },
+    alertDot: {
+      id: "asset-alert-dot",
+      type: "circle",
+      source: "assets",
+      filter: ["all", ["!", ["has", "point_count"]], [">", ["get", "alerts"], 0]],
+      paint: { "circle-radius": 6, "circle-color": pal.danger, "circle-stroke-color": pal.paper, "circle-stroke-width": 2, "circle-translate": [13, -13] },
     },
   };
-  const clusterCountLayer: LayerProps = {
-    id: "cluster-count",
-    type: "symbol",
-    source: "assets",
-    filter: ["has", "point_count"],
-    layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": LABEL_FONT, "text-size": 13 },
-    paint: { "text-color": theme === "dark" ? "#e5e9f0" : "#0f172a" },
-  };
-  const selectedHaloLayer: LayerProps = {
-    id: "asset-selected",
-    type: "circle",
-    source: "assets",
-    filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "selected"], 1]],
-    paint: { "circle-radius": 26, "circle-color": "#2563eb", "circle-opacity": 0.2, "circle-stroke-color": "#2563eb", "circle-stroke-width": 2 },
-  };
-  const arrowLayer: LayerProps = {
-    id: "asset-heading",
-    type: "symbol",
-    source: "assets",
-    filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "moving"], 1]],
-    layout: {
-      "icon-image": "heading-arrow",
-      "icon-size": 0.9,
-      "icon-rotate": ["get", "heading"],
-      "icon-rotation-alignment": "map",
-      "icon-offset": [0, -30],
-      "icon-allow-overlap": true,
-      "icon-ignore-placement": true,
-    },
-  };
-  const pointLayer: LayerProps = {
-    id: "asset-points",
-    type: "symbol",
-    source: "assets",
-    filter: ["!", ["has", "point_count"]],
-    layout: {
-      "icon-image": ["get", "icon"],
-      "icon-size": ["case", ["==", ["get", "selected"], 1], 0.75, 0.6],
-      "icon-allow-overlap": true,
-      "icon-ignore-placement": true,
-      "text-field": ["get", "name"],
-      "text-font": LABEL_FONT,
-      "text-size": 12,
-      "text-offset": [0, 1.6],
-      "text-anchor": "top",
-      "text-optional": true,
-    },
-    paint: {
-      "text-color": theme === "dark" ? "#e5e9f0" : "#0f172a",
-      "text-halo-color": theme === "dark" ? "#0b0f17" : "#ffffff",
-      "text-halo-width": 1.5,
-    },
-  };
-  const alertDotLayer: LayerProps = {
-    id: "asset-alert-dot",
-    type: "circle",
-    source: "assets",
-    filter: ["all", ["!", ["has", "point_count"]], [">", ["get", "alerts"], 0]],
-    paint: { "circle-radius": 5, "circle-color": "#ef4444", "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.5, "circle-translate": [12, -12] },
-  };
-  const accuracyFill: LayerProps = {
-    id: "accuracy-fill",
-    type: "fill",
-    source: "accuracy",
-    paint: { "fill-color": "#2563eb", "fill-opacity": ["case", ["==", ["get", "selected"], 1], 0.14, 0.07] },
-  };
-  const accuracyLine: LayerProps = {
-    id: "accuracy-line",
-    type: "line",
-    source: "accuracy",
-    paint: { "line-color": "#2563eb", "line-opacity": 0.5, "line-width": 1, "line-dasharray": [2, 2] },
-  };
-  const geofenceFill: LayerProps = { id: "geofence-fill", type: "fill", source: "geofences", paint: { "fill-color": ["get", "color"], "fill-opacity": 0.08 } };
-  const geofenceLine: LayerProps = { id: "geofence-line", type: "line", source: "geofences", paint: { "line-color": ["get", "color"], "line-width": 2, "line-dasharray": [3, 2] } };
-  const geofenceLabel: LayerProps = {
-    id: "geofence-label",
-    type: "symbol",
-    source: "geofences",
-    layout: { "text-field": ["get", "name"], "text-font": LABEL_FONT, "text-size": 11, "symbol-placement": "line", "text-letter-spacing": 0.05 },
-    paint: { "text-color": ["get", "color"], "text-halo-color": theme === "dark" ? "#0b0f17" : "#ffffff", "text-halo-width": 1.5 },
-  };
-  const trailLine: LayerProps = { id: "trail-line", type: "line", source: "trail", filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#2563eb", "line-width": 3, "line-opacity": 0.8 }, layout: { "line-join": "round", "line-cap": "round" } };
-  const trailStart: LayerProps = { id: "trail-start", type: "circle", source: "trail", filter: ["==", ["get", "kind"], "start"], paint: { "circle-radius": 5, "circle-color": "#ffffff", "circle-stroke-color": "#2563eb", "circle-stroke-width": 2 } };
 
   return (
     <div className={cn("relative h-full w-full", className)}>
@@ -369,7 +364,7 @@ export function AssetMap({
         initialViewState={DEFAULT_VIEW}
         mapStyle={baseStyle}
         onLoad={onLoad}
-        onStyleData={onStyleData}
+        onStyleData={register}
         onClick={onClick}
         interactiveLayerIds={loaded ? ["asset-points", "clusters"] : []}
         interactive={interactive}
@@ -380,73 +375,81 @@ export function AssetMap({
       >
         {loaded ? (
           <>
-            <Source id="geofences" type="geojson" data={geofenceGeoJson}>
-              <Layer {...geofenceFill} />
-              <Layer {...geofenceLine} />
-              <Layer {...geofenceLabel} />
+            <Source id="places" type="geojson" data={placesGeoJson}>
+              <Layer {...L.placeFill} />
+              <Layer {...L.placeLine} />
+              <Layer {...L.placeLabel} />
             </Source>
             {trailGeoJson ? (
               <Source id="trail" type="geojson" data={trailGeoJson}>
-                <Layer {...trailLine} />
-                <Layer {...trailStart} />
+                <Layer {...L.trailLine} />
+                <Layer {...L.trailStart} />
               </Source>
             ) : null}
             <Source id="accuracy" type="geojson" data={accuracyGeoJson}>
-              <Layer {...accuracyFill} />
-              <Layer {...accuracyLine} />
+              <Layer {...L.accFill} />
+              <Layer {...L.accLine} />
             </Source>
-            <Source id="assets" type="geojson" data={assetGeoJson} cluster clusterRadius={44} clusterMaxZoom={15} promoteId="id">
-              <Layer {...clusterLayer} />
-              <Layer {...clusterCountLayer} />
-              <Layer {...selectedHaloLayer} />
-              <Layer {...arrowLayer} />
-              <Layer {...pointLayer} />
-              <Layer {...alertDotLayer} />
+            {meGeoJson ? (
+              <Source id="me" type="geojson" data={meGeoJson}>
+                <Layer {...L.meArea} />
+                <Layer {...L.meDot} />
+              </Source>
+            ) : null}
+            <Source id="assets" type="geojson" data={assetGeoJson} cluster clusterRadius={48} clusterMaxZoom={15} promoteId="id">
+              <Layer {...L.cluster} />
+              <Layer {...L.clusterCount} />
+              <Layer {...L.halo} />
+              <Layer {...L.arrow} />
+              <Layer {...L.point} />
+              <Layer {...L.alertDot} />
             </Source>
           </>
         ) : null}
-        {showControls ? (
+        {controls === "full" ? (
           <>
-            <NavigationControl position="top-right" showCompass={false} />
-            <GeolocateControl position="top-right" trackUserLocation={false} showUserLocation />
-            <ScaleControl position="bottom-right" />
+            <NavigationControl position="bottom-right" showCompass={false} />
+            <ScaleControl position="bottom-left" />
           </>
         ) : null}
       </Map>
-      {showControls ? (
-        <div className="absolute right-2.5 top-[92px] flex flex-col gap-1.5">
-          <MapButton label="Fit all assets" onClick={fitAll}>
-            <Maximize2 className="h-4 w-4" />
-          </MapButton>
-          <MapButton
-            label={SATELLITE_AVAILABLE ? (satellite ? "Map view" : "Satellite view") : "Satellite view needs a tile key (see .env.example)"}
-            onClick={() => SATELLITE_AVAILABLE && setSatellite((s) => !s)}
-            disabled={!SATELLITE_AVAILABLE}
-            active={satellite}
-          >
-            {satellite ? <Layers className="h-4 w-4" /> : <Satellite className="h-4 w-4" />}
-          </MapButton>
+
+      {controls !== "none" ? (
+        <div className={cn("absolute right-3 flex flex-col gap-2", controls === "full" ? "top-3" : "bottom-4", controlsClassName)}>
+          <MapTool label="Show my location" onClick={locateMe} busy={locating}>
+            <LocateFixed className="h-[18px] w-[18px]" />
+          </MapTool>
+          <MapTool label="Show all assets" onClick={fitAll} disabled={located.length === 0}>
+            <Maximize2 className="h-[18px] w-[18px]" />
+          </MapTool>
+          {SATELLITE_AVAILABLE ? (
+            <MapTool label={satellite ? "Street map" : "Satellite"} onClick={() => setSatellite((s) => !s)} active={satellite}>
+              {satellite ? <Layers className="h-[18px] w-[18px]" /> : <Satellite className="h-[18px] w-[18px]" />}
+            </MapTool>
+          ) : null}
         </div>
       ) : null}
     </div>
   );
 }
 
-function MapButton({ children, label, onClick, disabled, active }: { children: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; active?: boolean }) {
+function MapTool({ children, label, onClick, disabled, active, busy }: { children: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; active?: boolean; busy?: boolean }) {
   return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      aria-pressed={active}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        "flex h-[29px] w-[29px] items-center justify-center rounded-md border border-border bg-surface text-foreground shadow-sm hover:bg-surface-2 disabled:opacity-40",
-        active && "bg-accent text-accent-foreground hover:bg-accent",
-      )}
-    >
-      {children}
-    </button>
+    <Tooltip content={label} side="left">
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={active}
+        disabled={disabled}
+        onClick={onClick}
+        className={cn(
+          "grid h-11 w-11 place-items-center rounded-2xl border border-border bg-card text-foreground shadow-md transition-colors hover:bg-muted active:scale-95 disabled:opacity-40",
+          active && "bg-primary text-primary-foreground hover:bg-primary",
+          busy && "animate-pulse",
+        )}
+      >
+        {children}
+      </button>
+    </Tooltip>
   );
 }

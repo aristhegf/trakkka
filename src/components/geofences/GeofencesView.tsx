@@ -2,17 +2,21 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Home, MapPin, Plus, Trash2, Pencil } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Home, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { useAssetStore } from "@/components/store/AssetStore";
-import { GeofenceEditor, type Draft } from "./GeofenceEditor";
+import { GeofenceEditor, PLACE_COLORS, type Draft } from "./GeofenceEditor";
 import { deleteGeofence, saveGeofence, setGeofenceAssignment, setHomeGeofence } from "@/lib/geofences/actions";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/shell/PageHeader";
+import { Button } from "@/components/motion/button/base";
+import { Switch } from "@/components/motion/switch";
+import { Tooltip } from "@/components/motion/tooltip";
+import { EmptyState, PageHeader, Section } from "@/components/kit/page";
+import { ConfirmDialog } from "@/components/kit/confirm";
+import { useActionToast } from "@/components/kit/toast";
+import { AssetIcon } from "@/components/assets/AssetIcon";
 import { relativeTime, formatDuration, formatDistance } from "@/lib/format";
 import { proximity } from "@/lib/geo";
-import { AssetIcon } from "@/components/assets/AssetIcon";
 import type { Geofence } from "@/lib/types";
-import { cn } from "@/lib/cn";
+import { cn } from "@/lib/utils";
 
 interface EventRow {
   id: number;
@@ -23,162 +27,205 @@ interface EventRow {
   dwell_seconds: number | null;
 }
 
+const NEW_DRAFT: Draft = { id: null, name: "", color: PLACE_COLORS[0], address: null, kind: "circle", center: null, radius_m: 200, ring: [] };
+
 export function GeofencesView({ homeGeofenceId, events }: { homeGeofenceId: string | null; events: EventRow[] }) {
   const { geofences, assetList, now, refresh, freshnessOf } = useAssetStore();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [editing, setEditing] = useState<Draft | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Geofence | null>(null);
+  const report = useActionToast();
   const assetName = useMemo(() => Object.fromEntries(assetList.map((a) => [a.id, a.name])), [assetList]);
   const fenceName = useMemo(() => Object.fromEntries(geofences.map((g) => [g.id, g.name])), [geofences]);
 
-  const done = async (m?: string) => {
-    setMsg(m ?? null);
-    await refresh();
-    router.refresh();
-  };
+  const run = (fn: () => Promise<{ error?: string; message?: string }>, success?: string, after?: () => void) =>
+    start(async () => {
+      const r = await fn();
+      if (report(r, success)) after?.();
+      await refresh();
+      router.refresh();
+    });
 
   const startEdit = (g: Geofence) =>
     setEditing(
       g.kind === "circle" && g.center
-        ? { id: g.id, name: g.name, color: g.color ?? "#2563eb", address: g.address, kind: "circle", center: g.center, radius_m: g.radius_m ?? 200, ring: [] }
-        : { id: g.id, name: g.name, color: g.color ?? "#2563eb", address: g.address, kind: "polygon", center: null, radius_m: 200, ring: g.geometry.coordinates[0].slice(0, -1).map(([lng, lat]) => [lng, lat] as [number, number]) },
+        ? { id: g.id, name: g.name, color: g.color ?? PLACE_COLORS[0], address: g.address, kind: "circle", center: g.center, radius_m: g.radius_m ?? 200, ring: [] }
+        : { id: g.id, name: g.name, color: g.color ?? PLACE_COLORS[0], address: g.address, kind: "polygon", center: null, radius_m: 200, ring: g.geometry.coordinates[0].slice(0, -1).map(([lng, lat]) => [lng, lat] as [number, number]) },
     );
+
+  const newPlace = () => setEditing({ ...NEW_DRAFT, name: geofences.length === 0 ? "Home" : "" });
 
   return (
     <div className="flex h-full min-h-0 flex-col md:flex-row">
-      <div className="scroll-thin min-h-0 w-full overflow-y-auto border-b border-border bg-surface md:w-[400px] md:border-b-0 md:border-r">
-        <div className="p-4">
-          <PageHeader
-            title="Places"
-            description="Home, office, vet, school… See which assets are at each place and get alerts when they arrive or leave."
-            actions={
-              <Button size="sm" onClick={() => setEditing({ id: null, name: "", color: "#2563eb", address: null, kind: "circle", center: null, radius_m: 200, ring: [] })}>
-                <Plus className="h-3.5 w-3.5" /> New place
-              </Button>
-            }
-          />
-          {msg ? <p className="mb-3 text-xs text-muted">{msg}</p> : null}
-          <ul className="space-y-3">
-            {geofences.length === 0 ? <li className="text-sm text-muted">No places yet. Start with Home: search its address or tap “Use my location” while you are there.</li> : null}
-            {geofences.map((g) => {
-              const near = assetList
-                .filter((a) => a.latitude != null && a.longitude != null)
-                .map((a) => ({ asset: a, ...proximity({ lng: a.longitude!, lat: a.latitude! }, g) }))
-                .sort((x, y) => x.distanceM - y.distanceM);
-              const insideCount = near.filter((n) => n.inside).length;
-              return (
-                <li key={g.id} className={cn("rounded-xl border border-border p-3", editing?.id === g.id && "border-accent")}>
-                  <div className="flex items-start gap-2">
-                    <span className="mt-1 inline-block h-3 w-3 shrink-0 rounded-full" style={{ background: g.color ?? "#2563eb" }} aria-hidden />
-                    <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-1.5 text-sm font-medium">
-                        <span className="truncate">{g.name}</span>
-                        {homeGeofenceId === g.id ? <Home className="h-3.5 w-3.5 shrink-0 text-accent" aria-label="Home" /> : null}
-                      </p>
-                      <p className="truncate text-xs text-muted" title={g.address ?? undefined}>
-                        {g.address ?? (g.center ? `${g.center.lat.toFixed(5)}, ${g.center.lng.toFixed(5)}` : "Drawn on the map")}
-                      </p>
-                      <p className="text-[11px] text-muted">
-                        {g.kind === "circle" ? `${Math.round(g.radius_m ?? 0)} m radius` : `Polygon, ${g.geometry.coordinates[0].length - 1} points`} · {insideCount} {insideCount === 1 ? "asset" : "assets"} here now
-                      </p>
-                    </div>
-                    <button type="button" onClick={() => startEdit(g)} className="rounded p-1 text-muted hover:bg-surface-2 hover:text-foreground" aria-label={`Edit ${g.name}`}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => {
-                        if (confirm(`Delete place "${g.name}"?`)) start(async () => done((await deleteGeofence(g.id)).message));
-                      }}
-                      className="rounded p-1 text-muted hover:bg-surface-2 hover:text-danger"
-                      aria-label={`Delete ${g.name}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  {near.length > 0 ? (
-                    <ul className="mt-2 divide-y divide-border rounded-lg border border-border">
-                      {near.map(({ asset, distanceM, inside }) => {
-                        const link = g.assets.find((l) => l.asset_id === asset.id);
-                        const f = freshnessOf(asset);
-                        return (
-                          <li key={asset.id} className="flex items-center gap-2 px-2 py-1.5 text-xs">
-                            <AssetIcon type={asset.type} size="sm" />
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate font-medium">{asset.name}</p>
-                              <p className="text-[11px] text-muted">
-                                {inside ? "Here" : `${formatDistance(distanceM)} away`}
-                                {f === "stale" || f === "offline" ? ` · as of ${relativeTime(asset.last_location_at, now)}` : ""}
-                              </p>
-                            </div>
-                            <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", inside ? "bg-success/15 text-success" : "bg-surface-2 text-muted")}>{inside ? "inside" : "outside"}</span>
-                            <label className="flex items-center gap-1 text-[11px] text-muted" title="Alert when this asset enters or leaves">
-                              <input type="checkbox" checked={Boolean(link)} disabled={pending} onChange={(e) => start(async () => done((await setGeofenceAssignment(g.id, asset.id, { assigned: e.target.checked })).message))} />
-                              alerts
-                            </label>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="mt-2 text-[11px] text-muted">No asset has a location yet.</p>
-                  )}
-
-                  {homeGeofenceId !== g.id ? (
-                    <button type="button" disabled={pending} onClick={() => start(async () => done((await setHomeGeofence(g.id)).message))} className="mt-2 text-[11px] text-accent hover:underline">
-                      Set as Home
-                    </button>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-
-          {events.length > 0 ? (
-            <section className="mt-6">
-              <h2 className="mb-2 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted">
-                <MapPin className="h-3 w-3" /> Recent arrivals and departures
-              </h2>
-              <ul className="divide-y divide-border rounded-xl border border-border text-xs">
-                {events.slice(0, 20).map((e) => (
-                  <li key={e.id} className="flex justify-between gap-2 px-3 py-1.5">
-                    <span>
-                      <span className="font-medium">{assetName[e.asset_id] ?? "Asset"}</span> {e.event_type === "enter" ? "arrived at" : "left"} <span className="font-medium">{fenceName[e.geofence_id] ?? "place"}</span>
-                      {e.dwell_seconds ? <span className="text-muted"> after {formatDuration(e.dwell_seconds)}</span> : null}
-                    </span>
-                    <span className="shrink-0 text-muted">{relativeTime(e.occurred_at, now)}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-        </div>
-      </div>
-      <div className="relative min-h-[360px] flex-1">
+      {/* Map: a strip on top on phones (full screen while editing), the right side on desktop. */}
+      <div className="relative h-[34vh] shrink-0 border-b border-border md:order-2 md:h-auto md:flex-1 md:border-b-0">
         <GeofenceEditor
           draft={editing}
           onChange={setEditing}
           onCancel={() => setEditing(null)}
-          onSave={(d) =>
-            start(async () => {
-              const r = await saveGeofence(
-                d.kind === "circle"
-                  ? { kind: "circle", id: d.id, name: d.name, color: d.color, address: d.address, center: d.center!, radius_m: d.radius_m }
-                  : { kind: "polygon", id: d.id, name: d.name, color: d.color, address: d.address, ring: d.ring },
-              );
-              if (r.error) setMsg(r.error);
-              else {
-                setEditing(null);
-                await done(r.message);
-              }
-            })
-          }
           saving={pending}
+          onSave={(d) =>
+            run(
+              () =>
+                saveGeofence(
+                  d.kind === "circle"
+                    ? { kind: "circle", id: d.id, name: d.name, color: d.color, address: d.address, center: d.center!, radius_m: d.radius_m }
+                    : { kind: "polygon", id: d.id, name: d.name, color: d.color, address: d.address, ring: d.ring },
+                ),
+              d.id ? "Place updated" : "Place saved",
+              () => setEditing(null),
+            )
+          }
         />
       </div>
+
+      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto md:order-1 md:w-[420px] md:flex-none md:border-r md:border-border">
+        <div className="px-4 pb-28 pt-4 md:px-6 md:pb-10 md:pt-6">
+          <PageHeader
+            title="Places"
+            description="Save the places that matter. See who is there now and get an alert when something arrives or leaves."
+            actions={
+              <Button onClick={newPlace} className="max-md:h-10 max-md:px-4">
+                <Plus className="h-4 w-4" /> Add
+              </Button>
+            }
+          />
+
+          {geofences.length === 0 ? (
+            <EmptyState
+              icon={<Home />}
+              title="Start with Home"
+              body="Search your address or use your current location while you are there. Then add others like Office or School."
+              action={
+                <Button onClick={newPlace}>
+                  <Plus className="h-4 w-4" /> Add Home
+                </Button>
+              }
+            />
+          ) : (
+            <ul className="space-y-3">
+              {geofences.map((g) => {
+                const isHome = homeGeofenceId === g.id;
+                const near = assetList
+                  .filter((a) => a.latitude != null && a.longitude != null)
+                  .map((a) => ({ asset: a, ...proximity({ lng: a.longitude!, lat: a.latitude! }, g) }))
+                  .sort((x, y) => x.distanceM - y.distanceM);
+                const insideCount = near.filter((n) => n.inside).length;
+                const color = g.color ?? PLACE_COLORS[0];
+                return (
+                  <li key={g.id} className={cn("rounded-3xl border bg-card p-4", editing?.id === g.id ? "border-primary ring-2 ring-primary/20" : "border-border")}>
+                    <div className="flex items-start gap-3">
+                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl" style={{ background: `${color}1f`, color }}>
+                        {isHome ? <Home className="h-5 w-5" /> : <MapPin className="h-5 w-5" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="flex items-center gap-2 font-semibold">
+                          <span className="truncate">{g.name}</span>
+                          {isHome ? <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Home</span> : null}
+                        </p>
+                        <p className="truncate text-sm text-muted-foreground" title={g.address ?? undefined}>
+                          {g.address ?? (g.kind === "circle" ? `Within ${formatDistance(g.radius_m ?? 0)} of a pin` : "Drawn area")}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{insideCount === 0 ? "Nothing here now" : `${insideCount} here now`}</p>
+                      </div>
+                      <div className="flex shrink-0">
+                        <Tooltip content="Edit">
+                          <button type="button" onClick={() => startEdit(g)} className="grid h-10 w-10 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`Edit ${g.name}`}>
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        </Tooltip>
+                        <Tooltip content="Delete">
+                          <button type="button" disabled={pending} onClick={() => setDeleting(g)} className="grid h-10 w-10 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Delete ${g.name}`}>
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </Tooltip>
+                      </div>
+                    </div>
+
+                    {near.length > 0 ? (
+                      <div className="mt-3 rounded-2xl bg-muted/50">
+                        <div className="flex items-center justify-between px-3.5 pb-1 pt-2.5 text-xs text-muted-foreground">
+                          <span>Distance now</span>
+                          <span>Alerts</span>
+                        </div>
+                        <ul>
+                          {near.map(({ asset, distanceM, inside }) => {
+                            const link = g.assets.find((l) => l.asset_id === asset.id);
+                            const f = freshnessOf(asset);
+                            return (
+                              <li key={asset.id} className="flex min-h-12 items-center gap-2.5 px-3.5 py-1.5">
+                                <AssetIcon type={asset.type} size="sm" />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-medium">{asset.name}</p>
+                                  <p className="truncate text-xs text-muted-foreground">
+                                    {inside ? <span className="font-medium text-fresh-live">Here</span> : `${formatDistance(distanceM)} away`}
+                                    {f === "stale" || f === "offline" || f === "unknown" ? ` · as of ${relativeTime(asset.last_location_at, now)}` : ""}
+                                  </p>
+                                </div>
+                                <Switch
+                                  checked={Boolean(link)}
+                                  disabled={pending}
+                                  ariaLabel={`Alerts for ${asset.name} at ${g.name}`}
+                                  onCheckedChange={(v) => run(() => setGeofenceAssignment(g.id, asset.id, { assigned: v }), v ? `Alerts on for ${asset.name}` : `Alerts off for ${asset.name}`)}
+                                />
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : (
+                      <p className="mt-3 rounded-2xl bg-muted/50 px-3.5 py-2.5 text-xs text-muted-foreground">None of your assets has a location yet.</p>
+                    )}
+
+                    {!isHome ? (
+                      <Button variant="ghost" size="sm" className="-ml-2 mt-2 h-9" disabled={pending} onClick={() => run(() => setHomeGeofence(g.id), `${g.name} is now Home`)}>
+                        <Home className="h-3.5 w-3.5" /> Make this Home
+                      </Button>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {events.length > 0 ? (
+            <Section title="Recent arrivals and departures" className="mt-6">
+              <ul className="space-y-1">
+                {events.slice(0, 20).map((e) => (
+                  <li key={e.id} className="flex items-start gap-3 py-1.5">
+                    <span className={cn("mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full", e.event_type === "enter" ? "bg-fresh-live/10 text-fresh-live" : "bg-muted text-muted-foreground")}>
+                      {e.event_type === "enter" ? <ArrowDownRight className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
+                    </span>
+                    <div className="min-w-0 flex-1 text-sm">
+                      <p>
+                        <span className="font-medium">{assetName[e.asset_id] ?? "An asset"}</span> {e.event_type === "enter" ? "arrived at" : "left"} <span className="font-medium">{fenceName[e.geofence_id] ?? "a place"}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {relativeTime(e.occurred_at, now)}
+                        {e.dwell_seconds ? ` · stayed ${formatDuration(e.dwell_seconds)}` : ""}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ) : null}
+        </div>
+      </div>
+
+      <ConfirmDialog
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        title={`Delete ${deleting?.name ?? "place"}?`}
+        body="Its alerts stop and it disappears from the map. Past arrivals and departures are kept."
+        pending={pending}
+        onConfirm={() => {
+          const g = deleting;
+          if (!g) return;
+          run(() => deleteGeofence(g.id), "Place deleted", () => setDeleting(null));
+        }}
+      />
     </div>
   );
 }
