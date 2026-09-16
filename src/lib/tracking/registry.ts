@@ -8,6 +8,7 @@ import {
   simulatedProvider,
 } from "./providers/generic";
 import { traccarProvider } from "./providers/traccar";
+import { ownTracksProvider, traccarClientProvider } from "./providers/phone-apps";
 
 const PROVIDERS: Record<ProviderKey, TrackingProvider | undefined> = {
   simulated: simulatedProvider,
@@ -16,6 +17,8 @@ const PROVIDERS: Record<ProviderKey, TrackingProvider | undefined> = {
   ios_companion: iosCompanionProvider,
   traccar: traccarProvider,
   flespi: undefined, // P3: webhook adapter, same NormalizedLocation contract
+  traccar_client: traccarClientProvider,
+  owntracks: ownTracksProvider,
   apple_findmy_reported: appleFindMyReportedProvider,
 };
 
@@ -33,7 +36,7 @@ export function providerOptionsFor(type: "device" | "pet" | "vehicle" | "other")
     case "pet":
       return ["simulated", "traccar", "apple_findmy_reported", "manual"];
     case "device":
-      return ["browser_geolocation", "apple_findmy_reported", "simulated", "manual"];
+      return ["traccar_client", "owntracks", "browser_geolocation", "apple_findmy_reported", "simulated", "manual"];
     default:
       return ["simulated", "manual", "apple_findmy_reported"];
   }
@@ -46,6 +49,9 @@ export const PROVIDER_HELP: Record<ProviderKey, string> = {
   ios_companion: "Trakkka iOS app (coming later). Background location with your consent.",
   traccar: "A GPS tracker reporting to your Traccar server, forwarded here.",
   flespi: "A GPS tracker on flespi, forwarded here (coming later).",
+  traccar_client:
+    "Your phone reports its own location in the background through the free Traccar Client app (iPhone and Android). Best for phones.",
+  owntracks: "Your phone reports its location through the free OwnTracks app (iPhone and Android), using HTTP mode.",
   apple_findmy_reported:
     "Apple offers no API for AirTag or Find My locations. Record a check-in by hand and open Find My for the live view.",
 };

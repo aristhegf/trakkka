@@ -17,7 +17,9 @@ export interface ActionResult {
   id?: string;
 }
 
-const optStr = (max: number) => z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? null : v), z.string().trim().max(max).nullable());
+// Absent (field not rendered, e.g. tracker ID for phone/manual sources) and blank both mean "not provided".
+const optStr = (max: number) =>
+  z.preprocess((v) => (v == null || (typeof v === "string" && v.trim() === "") ? null : v), z.string().trim().max(max).nullable());
 const optNum = z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().finite().nullable());
 const optInt = z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().int().nullable());
 
@@ -25,7 +27,7 @@ const baseSchema = z.object({
   name: z.string().trim().min(1).max(80),
   type: z.enum(["device", "pet", "vehicle", "other"]),
   description: optStr(1000),
-  color: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? null : v), z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable()),
+  color: z.preprocess((v) => (v == null || (typeof v === "string" && v.trim() === "") ? null : v), z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable()),
   tracking_provider_key: z.string().min(1),
   tracker_model: optStr(80),
   external_device_id: optStr(120),
@@ -34,7 +36,7 @@ const baseSchema = z.object({
 const petSchema = z.object({
   species: optStr(40),
   breed: optStr(60),
-  sex: z.preprocess((v) => (v === "" ? null : v), z.enum(["male", "female", "unknown"]).nullable()),
+  sex: z.preprocess((v) => (v == null || v === "" ? null : v), z.enum(["male", "female", "unknown"]).nullable()),
   date_of_birth: optStr(10),
   microchip_id: optStr(40),
   weight_kg: optNum,
@@ -51,12 +53,12 @@ const vehicleSchema = z.object({
   registration_number: optStr(20),
   vin: optStr(17),
   color: optStr(30),
-  fuel_type: z.preprocess((v) => (v === "" ? null : v), z.enum(["petrol", "diesel", "electric", "hybrid", "unknown"]).nullable()),
+  fuel_type: z.preprocess((v) => (v == null || v === "" ? null : v), z.enum(["petrol", "diesel", "electric", "hybrid", "unknown"]).nullable()),
   speed_limit_kph: optInt,
 });
 
 const deviceSchema = z.object({
-  device_type: z.preprocess((v) => (v === "" ? null : v), z.enum(["phone", "tablet", "laptop", "watch", "tracker", "other"]).nullable()),
+  device_type: z.preprocess((v) => (v == null || v === "" ? null : v), z.enum(["phone", "tablet", "laptop", "watch", "tracker", "other"]).nullable()),
   manufacturer: optStr(40),
   model: optStr(60),
   serial_number: optStr(80),

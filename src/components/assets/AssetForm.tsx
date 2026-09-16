@@ -28,14 +28,16 @@ export function AssetForm({
 }) {
   const { providers } = useAssetStore();
   const [type, setType] = useState<AssetType>(asset?.type ?? "pet");
-  const [provider, setProvider] = useState<ProviderKey>((asset?.tracking_provider_key as ProviderKey) ?? "simulated");
+  // null until the user picks one: the default is then the first (recommended) option for the chosen asset type.
+  const [provider, setProvider] = useState<ProviderKey | null>((asset?.tracking_provider_key as ProviderKey) ?? null);
   const action = mode === "create" ? createAsset : updateAsset.bind(null, asset!.id);
   const [state, formAction, pending] = useActionState<ActionResult | undefined, FormData>(action, undefined);
 
   const providerOptions = providerOptionsFor(type).filter((k) => providers[k]);
-  const currentProvider = providerOptions.includes(provider) ? provider : providerOptions[0];
+  const currentProvider = provider && providerOptions.includes(provider) ? provider : providerOptions[0];
   const providerRow: TrackingProviderRow | undefined = providers[currentProvider];
-  const needsToken = currentProvider === "simulated" || currentProvider === "traccar" || currentProvider === "ios_companion";
+  const needsToken = ["simulated", "traccar", "ios_companion", "traccar_client", "owntracks"].includes(currentProvider);
+  const isPhoneApp = currentProvider === "traccar_client" || currentProvider === "owntracks";
 
   if (state?.id && mode === "create") {
     return (
@@ -103,7 +105,7 @@ export function AssetForm({
               {providerRow.offline_after_s > 0 ? ` No-report alert after ${Math.round(providerRow.offline_after_s / 60)} min.` : ""}
             </p>
           ) : null}
-          {needsToken ? (
+          {needsToken && !isPhoneApp ? (
             <>
               <Field label="Tracker / device ID" hint="For Traccar use the device's IMEI or uniqueId. Optional for the simulator.">
                 <Input name="external_device_id" maxLength={120} />
