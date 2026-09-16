@@ -38,10 +38,18 @@ export function formatAccuracy(m: number | null | undefined): string {
   return `±${(m / 1000).toFixed(1)} km`;
 }
 
-export function formatDateTime(at: string | Date | null | undefined, tz?: string): string {
+/**
+ * Locale and timezone are pinned so the server render and the client hydration produce identical
+ * text (Vercel renders in UTC with a different default locale than a browser in Lagos).
+ * `tz` comes from the user's profile (default Africa/Lagos).
+ */
+const LOCALE = "en-GB";
+export const DEFAULT_TZ = "Africa/Lagos";
+
+export function formatDateTime(at: string | Date | null | undefined, tz: string = DEFAULT_TZ): string {
   if (!at) return "—";
   const d = typeof at === "string" ? new Date(at) : at;
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString(LOCALE, {
     timeZone: tz,
     month: "short",
     day: "numeric",
@@ -50,9 +58,9 @@ export function formatDateTime(at: string | Date | null | undefined, tz?: string
   });
 }
 
-export function formatTime(at: string | Date, tz?: string): string {
+export function formatTime(at: string | Date, tz: string = DEFAULT_TZ): string {
   const d = typeof at === "string" ? new Date(at) : at;
-  return d.toLocaleTimeString(undefined, { timeZone: tz, hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString(LOCALE, { timeZone: tz, hour: "2-digit", minute: "2-digit" });
 }
 
 export function coordLabel(lat: number | null, lng: number | null): string {

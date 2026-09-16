@@ -5,10 +5,12 @@ import { Check } from "lucide-react";
 import type { Alert } from "@/lib/types";
 import { relativeTime, formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { useAssetStore } from "@/components/store/AssetStore";
 
 const SEVERITY_DOT = { info: "bg-accent", warning: "bg-warning", critical: "bg-danger" } as const;
 
 export function AlertRow({ alert, now, assetName, onAcknowledge }: { alert: Alert; now: Date; assetName?: string; onAcknowledge?: () => void }) {
+  const { timezone } = useAssetStore();
   const open = !alert.acknowledged_at && !alert.resolved_at;
   return (
     <li className={cn("flex items-start gap-3 p-3 text-sm", !open && "opacity-70")}>
@@ -24,7 +26,7 @@ export function AlertRow({ alert, now, assetName, onAcknowledge }: { alert: Aler
               ·{" "}
             </>
           ) : null}
-          <span title={formatDateTime(alert.triggered_at)}>{relativeTime(alert.triggered_at, now)}</span>
+          <span title={formatDateTime(alert.triggered_at, timezone)}>{relativeTime(alert.triggered_at, now)}</span>
           {alert.resolved_at ? " · resolved" : alert.acknowledged_at ? " · acknowledged" : ""}
         </p>
         {alert.body ? <p className="mt-0.5 text-xs text-muted">{alert.body}</p> : null}

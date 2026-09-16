@@ -10,6 +10,7 @@ import { updateProfile, type ActionResult } from "@/lib/settings/actions";
 import { updateNotificationPreferences } from "@/lib/alerts/actions";
 import { deleteAccount, updatePassword } from "@/lib/auth/actions";
 import { relativeTime } from "@/lib/format";
+import { useAssetStore } from "@/components/store/AssetStore";
 
 interface AuditRow {
   id: number;
@@ -21,6 +22,7 @@ interface AuditRow {
 
 export function SettingsView({ email, displayName, timezone, emailAlerts, hasPassword, audit }: { email: string; displayName: string; timezone: string; emailAlerts: boolean; hasPassword: boolean; audit: AuditRow[] }) {
   const { theme, setTheme } = useTheme();
+  const { now } = useAssetStore();
   const [profile, profileAction, profilePending] = useActionState<ActionResult | undefined, FormData>(updateProfile, undefined);
   const [notif, notifAction, notifPending] = useActionState<ActionResult | undefined, FormData>(updateNotificationPreferences, undefined);
   const [pw, pwAction, pwPending] = useActionState<ActionResult | undefined, FormData>(updatePassword, undefined);
@@ -95,7 +97,7 @@ export function SettingsView({ email, displayName, timezone, emailAlerts, hasPas
             {audit.map((a) => (
               <li key={a.id} className="flex justify-between gap-2 py-1.5">
                 <span className="font-mono">{a.action}</span>
-                <span className="text-muted">{relativeTime(a.created_at)}</span>
+                <span className="text-muted">{relativeTime(a.created_at, now)}</span>
               </li>
             ))}
           </ul>

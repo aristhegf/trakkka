@@ -11,7 +11,7 @@ import { BatteryIcon } from "./AssetListItem";
 import { cn } from "@/lib/cn";
 
 export function DetailPanel({ asset, freshness, onClose, embedded = false }: { asset: AssetOverview; freshness: Freshness; onClose: () => void; embedded?: boolean }) {
-  const { now, alerts, geofences, providers } = useAssetStore();
+  const { now, alerts, geofences, providers, timezone } = useAssetStore();
   const provider = asset.tracking_provider_key ? providers[asset.tracking_provider_key] : undefined;
   const assetAlerts = alerts.filter((a) => a.asset_id === asset.id && !a.acknowledged_at && !a.resolved_at);
   const inside = geofences.filter((g) => g.assets.some((l) => l.asset_id === asset.id && l.is_inside));
@@ -60,7 +60,7 @@ export function DetailPanel({ asset, freshness, onClose, embedded = false }: { a
 
         <dl className="grid grid-cols-2 gap-3">
           <Stat icon={Navigation} label="Status" value={status} />
-          <Stat icon={Clock} label="Last updated" value={asset.last_location_at ? relativeTime(asset.last_location_at, now) : "—"} sub={asset.last_location_at ? formatDateTime(asset.last_location_at) : undefined} />
+          <Stat icon={Clock} label="Last updated" value={asset.last_location_at ? relativeTime(asset.last_location_at, now) : "—"} sub={asset.last_location_at ? formatDateTime(asset.last_location_at, timezone) : undefined} />
           <Stat icon={MapPin} label="Location" value={asset.place_label ?? (asset.latitude != null ? "Unnamed area" : "—")} sub={coordLabel(asset.latitude, asset.longitude)} />
           <Stat icon={Crosshair} label="Accuracy" value={asset.last_location_at ? formatAccuracy(asset.accuracy_m) : "—"} sub={asset.accuracy_m != null && asset.accuracy_m > 100 ? "Approximate" : undefined} />
           {provider?.capabilities.battery ? (
