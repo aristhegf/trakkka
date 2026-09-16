@@ -1,4 +1,4 @@
-# AssetWatch — Database Schema (Phase 1 design)
+# Trakkka — Database Schema (Phase 1 design)
 
 Target: Supabase Postgres 15+ with PostGIS, pg_cron, pg_net, Vault. All ids are UUID v4
 (`gen_random_uuid()`) except `locations.id` (bigint identity, partition friendly). Every table has

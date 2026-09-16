@@ -59,7 +59,7 @@ export function BrowserReporter({ assetId }: { assetId: string }) {
   return (
     <div className="space-y-2 rounded-lg border border-border bg-surface p-3">
       <p className="text-sm font-semibold">Report this browser&apos;s location</p>
-      <p className="text-xs text-muted">Works only while AssetWatch is open in this tab. Browsers do not allow background location for websites; the iOS companion app is the path for that.</p>
+      <p className="text-xs text-muted">Works only while Trakkka is open in this tab. Browsers do not allow background location for websites; the iOS companion app is the path for that.</p>
       <div className="flex items-center gap-3">
         <Button
           size="sm"

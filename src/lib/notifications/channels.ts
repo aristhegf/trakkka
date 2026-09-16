@@ -35,14 +35,14 @@ export const emailChannel: NotificationChannel = {
     const { data, error } = await resend.emails.send({
       from,
       to: recipient.email,
-      subject: `[AssetWatch] ${alert.title}`,
+      subject: `[Trakkka] ${alert.title}`,
       text: [
         alert.title,
         alert.body ?? "",
         assetName ? `Asset: ${assetName}` : "",
         `When: ${new Date(alert.triggered_at).toLocaleString("en-GB", { timeZone: "Africa/Lagos" })} (Lagos)`,
         "",
-        `Open AssetWatch: ${link}`,
+        `Open Trakkka: ${link}`,
       ]
         .filter(Boolean)
         .join("\n"),

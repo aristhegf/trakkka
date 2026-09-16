@@ -1,4 +1,4 @@
-# AssetWatch — Phase 1 Audit of the existing `trakkka` repository
+# Trakkka — Phase 1 Audit of the original `trakkka` repository
 
 Audited: commit `35ec331` on branch `claude/assetwatch-dashboard-eb2621` (worktree), 2026-09-16.
 
@@ -40,14 +40,14 @@ Audited: commit `35ec331` on branch `claude/assetwatch-dashboard-eb2621` (worktr
 
 | Component | Decision | Reason |
 |---|---|---|
-| `index.html` | **Replace entirely** | Different product, no framework, no auth, insecure data path. Nothing is worth porting; the AssetWatch UI is map-first. |
-| `phone_theft_cases` table | **Do not reuse; do not touch** | Unrelated data. Leave it untouched in the Supabase project (or the user can drop it). AssetWatch tables are new. |
+| `index.html` | **Replace entirely** | Different product, no framework, no auth, insecure data path. Nothing is worth porting; the new Trakkka UI is map-first. |
+| `phone_theft_cases` table | **Do not reuse; do not touch** | Unrelated data. Leave it untouched in the Supabase project (or the user can drop it). Trakkka tables are new. |
 | Supabase project `aacluaqznzfgstwirbhk` | **Reusable as infrastructure, but recommend a fresh project** | A fresh project gives a clean schema, clean auth config, and avoids inheriting whatever open policies exist. If the same project is kept, the publishable key should be rotated after S1 is fixed. |
 | Supabase + Vercel choice | **Keep** | Matches the stated stack preference and is a good fit (Postgres + PostGIS + Auth + Realtime + Storage in one). |
 | README | **Replace** | Describes the old product. |
 | Git history | **Keep** | New work goes in on this branch; history stays. |
 
-Net: the "existing project" is an empty starting point. AssetWatch is a greenfield build inside this repo.
+Net: the "existing project" is an empty starting point. The new Trakkka is a greenfield build inside this repo.
 
 ## 5. What is missing (everything in the brief)
 

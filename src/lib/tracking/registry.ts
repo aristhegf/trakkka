@@ -42,8 +42,8 @@ export function providerOptionsFor(type: "device" | "pet" | "vehicle" | "other")
 export const PROVIDER_HELP: Record<ProviderKey, string> = {
   simulated: "Fake tracker for testing. Drive it with the simulator script.",
   manual: "You enter the location yourself. Never shown as live.",
-  browser_geolocation: "This browser reports its own position while AssetWatch is open. Foreground only.",
-  ios_companion: "AssetWatch iOS app (coming later). Background location with your consent.",
+  browser_geolocation: "This browser reports its own position while Trakkka is open. Foreground only.",
+  ios_companion: "Trakkka iOS app (coming later). Background location with your consent.",
   traccar: "A GPS tracker reporting to your Traccar server, forwarded here.",
   flespi: "A GPS tracker on flespi, forwarded here (coming later).",
   apple_findmy_reported:

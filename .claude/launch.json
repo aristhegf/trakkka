@@ -2,13 +2,13 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "assetwatch-dev",
+      "name": "trakkka-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 4127
     },
     {
-      "name": "assetwatch-verify",
+      "name": "trakkka-verify",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["next", "dev", "-p", "4128"],
       "port": 4128

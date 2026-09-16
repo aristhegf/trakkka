@@ -1,5 +1,5 @@
 /**
- * AssetWatch simulator: streams realistic Lagos location data into the real ingest API.
+ * Trakkka simulator: streams realistic Lagos location data into the real ingest API.
  *
  * Two ways to run:
  *   1. With device tokens you already have (no DB access needed):
