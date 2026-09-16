@@ -9,12 +9,20 @@ import { relativeTime, formatSpeedKph, formatAccuracy, coordLabel, formatDateTim
 import { useAssetStore } from "@/components/store/AssetStore";
 import { BatteryIcon } from "./AssetListItem";
 import { cn } from "@/lib/cn";
+import { proximity } from "@/lib/geo";
+import { formatDistance } from "@/lib/format";
 
 export function DetailPanel({ asset, freshness, onClose, embedded = false }: { asset: AssetOverview; freshness: Freshness; onClose: () => void; embedded?: boolean }) {
   const { now, alerts, geofences, providers, timezone } = useAssetStore();
   const provider = asset.tracking_provider_key ? providers[asset.tracking_provider_key] : undefined;
   const assetAlerts = alerts.filter((a) => a.asset_id === asset.id && !a.acknowledged_at && !a.resolved_at);
   const inside = geofences.filter((g) => g.assets.some((l) => l.asset_id === asset.id && l.is_inside));
+  const nearest =
+    asset.latitude != null && asset.longitude != null && geofences.length > 0
+      ? geofences
+          .map((g) => ({ g, ...proximity({ lng: asset.longitude!, lat: asset.latitude! }, g) }))
+          .sort((a, b) => a.distanceM - b.distanceM)[0]
+      : null;
   const moving = asset.movement_state === "moving" && (freshness === "live" || freshness === "recent");
   const status = !asset.last_location_at ? "No location yet" : moving ? (asset.type === "vehicle" ? "Driving" : "Moving") : asset.movement_state === "stationary" ? "Stationary" : "Unknown";
 
@@ -74,9 +82,11 @@ export function DetailPanel({ asset, freshness, onClose, embedded = false }: { a
           {asset.type === "vehicle" || provider?.capabilities.speed ? <Stat icon={Gauge} label="Speed" value={moving ? formatSpeedKph(asset.speed_mps) : "0 km/h"} /> : null}
         </dl>
 
-        {inside.length > 0 ? (
+        {nearest ? (
           <p className="mt-3 flex items-center gap-1.5 text-xs text-muted">
-            <Fence className="h-3.5 w-3.5" /> Inside {inside.map((g) => g.name).join(", ")}
+            <Fence className="h-3.5 w-3.5" />
+            {nearest.inside ? `At ${nearest.g.name}` : `Nearest place: ${nearest.g.name}, ${formatDistance(nearest.distanceM)} away`}
+            {inside.length > 1 ? ` · also inside ${inside.filter((g) => g.id !== nearest.g.id).map((g) => g.name).join(", ")}` : ""}
           </p>
         ) : null}
         <p className="mt-3 text-[11px] text-muted">

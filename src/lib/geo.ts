@@ -76,6 +76,41 @@ export function bbox(points: LngLat[]): [[number, number], [number, number]] | n
   ];
 }
 
+/** Ray-casting point-in-polygon on a GeoJSON ring ([lng, lat] pairs). Good enough at place scale. */
+export function pointInRing(p: LngLat, ring: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    const intersects = yi > p.lat !== yj > p.lat && p.lng < ((xj - xi) * (p.lat - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+/** Centroid of a ring (average of vertices; fine for small, convex-ish places). */
+export function ringCentroid(ring: number[][]): LngLat {
+  const pts = ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1] ? ring.slice(0, -1) : ring;
+  const sum = pts.reduce((acc, [lng, lat]) => ({ lng: acc.lng + lng, lat: acc.lat + lat }), { lng: 0, lat: 0 });
+  return { lng: sum.lng / pts.length, lat: sum.lat / pts.length };
+}
+
+export interface PlaceLike {
+  kind: "circle" | "polygon";
+  center: LngLat | null;
+  radius_m: number | null;
+  geometry: GeoJSON.Polygon;
+}
+
+/** Distance (m) from a point to a place's centre and whether the point is inside it. */
+export function proximity(p: LngLat, place: PlaceLike): { distanceM: number; inside: boolean } {
+  const ring = place.geometry.coordinates[0];
+  const center = place.center ?? ringCentroid(ring);
+  const distanceM = haversineM(p, center);
+  const inside = place.kind === "circle" && place.radius_m != null ? distanceM <= place.radius_m : pointInRing(p, ring);
+  return { distanceM, inside };
+}
+
 const GEOHASH_ALPHABET = "0123456789bcdefghjkmnpqrstuvwxyz";
 
 /** Geohash encoder (matches PostGIS ST_GeoHash for the same precision). */

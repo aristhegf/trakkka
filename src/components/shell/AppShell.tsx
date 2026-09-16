@@ -10,7 +10,7 @@ import { signOut } from "@/lib/auth/actions";
 
 const NAV = [
   { href: "/dashboard", label: "Map", icon: LayoutDashboard },
-  { href: "/geofences", label: "Geofences", icon: Fence },
+  { href: "/geofences", label: "Places", icon: Fence },
   { href: "/alerts", label: "Alerts", icon: Bell },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
