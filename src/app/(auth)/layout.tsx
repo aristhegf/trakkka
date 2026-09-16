@@ -9,11 +9,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
             <Radar className="h-5 w-5" aria-hidden />
           </span>
-          <span className="text-lg font-semibold tracking-tight">AssetWatch</span>
+          <span className="text-lg font-semibold tracking-tight">Trakkka</span>
         </Link>
         <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">{children}</div>
         <p className="mt-6 text-center text-xs text-muted">
-          Location data is sensitive. AssetWatch only ever shows assets you registered yourself.
+          Location data is sensitive. Trakkka only ever shows assets you registered yourself.
         </p>
       </div>
     </div>

@@ -77,7 +77,7 @@ async function nominatim(q: string, signal: AbortSignal): Promise<GeocodeHit[]> 
   const res = await fetch(url, {
     signal,
     headers: {
-      "User-Agent": `AssetWatch/0.1 (${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4127"})`,
+      "User-Agent": `Trakkka/0.1 (${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4127"})`,
       "Accept-Language": "en",
     },
   });

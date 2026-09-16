@@ -26,7 +26,7 @@ export function AppShell({ children, isAdmin, displayName }: { children: React.R
     <div className="flex h-dvh w-full overflow-hidden bg-background">
       {/* Desktop rail */}
       <aside className="hidden w-16 shrink-0 flex-col items-center border-r border-border bg-surface py-3 md:flex">
-        <Link href="/dashboard" className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-foreground" aria-label="AssetWatch">
+        <Link href="/dashboard" className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-foreground" aria-label="Trakkka">
           <Radar className="h-5 w-5" />
         </Link>
         <nav className="flex flex-1 flex-col items-center gap-1">

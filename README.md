@@ -1,4 +1,4 @@
-# AssetWatch
+# Trakkka
 
 One live map for the things you own: devices, pets, vehicles and anything else with a tracker.
 Every displayed location carries its **source, timestamp, accuracy and freshness state**; nothing is
@@ -33,7 +33,7 @@ Fill in `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (Proj
 ## 3. Apply the database migrations
 
 The schema, RLS policies, ingest functions, realtime triggers and cron jobs are in
-`supabase/migrations/0001…0007`. Apply them **in order** either with the CLI:
+`supabase/migrations/` (0001 onwards). Apply them **in order** either with the CLI:
 
 ```bash
 npx supabase login
@@ -71,7 +71,7 @@ npm install
 npm run dev
 ```
 
-AssetWatch is pinned to **port 4127** on purpose (see the `dev`/`start` scripts in `package.json`), so it never
+Trakkka is pinned to **port 4127** on purpose (see the `dev`/`start` scripts in `package.json`), so it never
 collides with another project's default `:3000` dev server. Open http://localhost:4127, sign up, and add an
 asset. Choose **Simulated tracker** as the tracking method to get a
 device token, then stream fake Lagos data into the real ingest pipeline:
@@ -110,7 +110,7 @@ panel also shows the asset's nearest place ("At Home", or "Nearest place: Office
 ## 6. Connecting a real GPS tracker (Traccar)
 
 1. Run Traccar (Docker or a VPS), point the tracker at it (GT06 → port 5023, Teltonika → 5027).
-2. In AssetWatch, create the asset with tracking method **Traccar** and the tracker's IMEI as the device ID. Copy the token.
+2. In Trakkka, create the asset with tracking method **Traccar** and the tracker's IMEI as the device ID. Copy the token.
 3. In `traccar.xml`:
    ```xml
    <entry key='forward.enable'>true</entry>

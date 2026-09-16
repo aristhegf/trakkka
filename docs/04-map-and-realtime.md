@@ -1,4 +1,4 @@
-# AssetWatch — Map provider, realtime and infrastructure evaluation (verified 2026-09-16)
+# Trakkka — Map provider, realtime and infrastructure evaluation (verified 2026-09-16)
 
 All prices and limits were read from vendor pages on the date above.
 

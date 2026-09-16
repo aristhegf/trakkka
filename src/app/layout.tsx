@@ -7,11 +7,11 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: { default: "AssetWatch", template: "%s · AssetWatch" },
+  title: { default: "Trakkka", template: "%s · Trakkka" },
   description: "One live map for your devices, pets and vehicles.",
-  applicationName: "AssetWatch",
+  applicationName: "Trakkka",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "AssetWatch", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Trakkka", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {

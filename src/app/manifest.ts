@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "AssetWatch",
-    short_name: "AssetWatch",
+    name: "Trakkka",
+    short_name: "Trakkka",
     description: "One live map for your devices, pets and vehicles.",
     start_url: "/dashboard",
     display: "standalone",

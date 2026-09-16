@@ -1,4 +1,4 @@
-# AssetWatch — Integration feasibility (verified September 2026)
+# Trakkka — Integration feasibility (verified September 2026)
 
 Every claim below was checked against a primary source during Phase 1. Where the only option is
 unofficial or reverse-engineered, it is listed and **excluded**.
@@ -34,7 +34,7 @@ Mac/iPad/Watch, or family-member locations. No scraping, no iCloud session repla
 
 **Supported architecture — two tiers of Apple asset:**
 
-1. **Live tier: iPhone/iPad running the AssetWatch companion app (P3).** Core Location on the user's
+1. **Live tier: iPhone/iPad running the Trakkka companion app (P3).** Core Location on the user's
    own device, with explicit consent, posts normalised locations to the ingest API using a per-install
    token. Default power profile: significant-change + visits + `CLMonitor` geofences (system relaunches
    the app), with `liveUpdates` only while the app is foregrounded or a `CLBackgroundActivitySession`
@@ -78,7 +78,7 @@ or third-party locations are ingested.
 
 Conclusions: OEM/connected-car APIs and US OBD dongles are not usable in Nigeria. Fleet platforms are B2B and
 Cartrack's webhooks do not carry location. The realistic path is an **unlocked GPS tracker + local SIM**
-reporting to **Traccar** (or flespi), which forwards normalised JSON to AssetWatch.
+reporting to **Traccar** (or flespi), which forwards normalised JSON to Trakkka.
 
 ### B.2 Hardware that works on Traccar/flespi
 
@@ -104,7 +104,7 @@ https://fenixtelematics.ng/blog/car-tracker-subscription-costs-nigeria/
 ```
 Tracker (GT06/Teltonika over TCP, local SIM)
   → Traccar (1–2 GB VPS, Docker; ports 5023/5027 open; 8082 behind HTTPS)
-  → forward.type=json, forward.url=https://assetwatch.app/api/ingest/traccar,
+  → forward.type=json, forward.url=https://trakkka.vercel.app/api/ingest/traccar,
     forward.header="Authorization: Bearer <integration token>", forward.retry.enable=true
   → TraccarAdapter.parse(): { position, device } → NormalizedLocation
   → ingest_location() → asset_states → Broadcast → map
@@ -113,7 +113,7 @@ Backfill: GET /api/positions?deviceId&from&to with a Traccar bearer token (store
 
 Traccar sends no signature, so the per-integration bearer token plus an optional source-IP allowlist is the
 authentication. `event.forward.url` is pointed at `/api/ingest/traccar/events` for `deviceOffline`,
-`ignitionOn/Off`, `deviceOverspeed`, `alarm` (sos, powerCut, tow, vibration), which map to AssetWatch alerts
+`ignitionOn/Off`, `deviceOverspeed`, `alarm` (sos, powerCut, tow, vibration), which map to Trakkka alerts
 and to `connection_status` (the only "offline" we ever display is one a provider reported).
 
 Field mapping (Traccar position → `NormalizedLocation`):
@@ -166,7 +166,7 @@ is explicitly for testing and is deleted after 60 days of inactivity, so it is a
   throttling. All are **excluded**.
 - **None of the branded products officially supports Nigeria.** Tractive would function on roaming but must be
   bought and subscribed abroad, and still has no API.
-- **AirTag on a collar** is possible for the owner via the Find My app only; AssetWatch represents it as a
+- **AirTag on a collar** is possible for the owner via the Find My app only; Trakkka represents it as a
   linked-tier `apple_findmy_reported` asset (manual check-in), exactly like any other AirTag (section A.2).
 - **The viable path is the same as vehicles:** a GT06/H02-speaking GPS collar with a local SIM, reporting to
   Traccar/flespi, forwarded to the same ingest endpoint. Pets are a first-class asset type in the schema; the
@@ -195,5 +195,5 @@ SIM, pointed at the same Traccar server as the vehicle. Provisioning by SMS is d
 | Branded pet tracker APIs (Tractive, Fi, Jiobit…) | Unofficial only ⇒ excluded; none support Nigeria. |
 | OEM connected-car APIs in Nigeria | Not offered. |
 | US OBD dongle APIs in Nigeria | Not supported. |
-| Live vehicle/pet tracking | **Possible** with GPS tracker hardware + Traccar/flespi ⇒ AssetWatch ingest. |
+| Live vehicle/pet tracking | **Possible** with GPS tracker hardware + Traccar/flespi ⇒ Trakkka ingest. |
 | Live iPhone tracking | **Possible** with the companion app (P3), consent-gated. |

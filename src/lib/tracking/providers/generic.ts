@@ -2,7 +2,7 @@ import { z } from "zod";
 import { normalizedLocationSchema, type ParseResult, type TrackingProvider } from "../types";
 
 /**
- * The "AssetWatch native" payload: already-normalized records.
+ * The "Trakkka native" payload: already-normalized records.
  * Used by the simulator, the browser geolocation reporter and the future companion apps.
  * Accepts a single record or a batch: { locations: [...], statuses: [...] }.
  */
@@ -37,7 +37,7 @@ export const simulatedProvider: TrackingProvider = {
 
 export const iosCompanionProvider: TrackingProvider = {
   key: "ios_companion",
-  name: "AssetWatch iOS app",
+  name: "Trakkka iOS app",
   kind: "client_reported",
   capabilities: { battery: true, speed: true, heading: true, accuracy: true, history: true },
   auth: "device_token",

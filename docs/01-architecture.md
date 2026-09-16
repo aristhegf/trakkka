@@ -1,4 +1,4 @@
-# AssetWatch — System Architecture (Phase 1)
+# Trakkka — System Architecture (Phase 1)
 
 Companion documents: `00-audit.md` (existing repo + plan), `02-database-schema.md`,
 `03-integrations.md` (Apple / vehicle / pet feasibility with sources), `04-map-and-realtime.md`
