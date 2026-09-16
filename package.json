@@ -5,6 +5,8 @@
   "scripts": {
     "predev": "node scripts/copy-map-worker.mjs",
     "dev": "next dev -p 4127",
+    "predev:verify": "node scripts/copy-map-worker.mjs",
+    "dev:verify": "next dev -p 4128",
     "prebuild": "node scripts/copy-map-worker.mjs",
     "build": "next build",
     "start": "next start -p 4127",
