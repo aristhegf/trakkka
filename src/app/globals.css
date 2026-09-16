@@ -1,0 +1,127 @@
+@import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --background: #f6f7f9;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --surface-3: #e5e8ee;
+  --border: #dde1e7;
+  --muted: #64748b;
+  --accent: #2563eb;
+  --accent-foreground: #ffffff;
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --fresh-live: #22c55e;
+  --fresh-recent: #eab308;
+  --fresh-stale: #f97316;
+  --fresh-offline: #ef4444;
+  --fresh-unknown: #9ca3af;
+  --type-pet: #f59e0b;
+  --type-vehicle: #3b82f6;
+  --type-device: #8b5cf6;
+  --type-other: #64748b;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --background: #0b0f17;
+  --foreground: #e5e9f0;
+  --surface: #121826;
+  --surface-2: #182033;
+  --surface-3: #1f2a40;
+  --border: #253048;
+  --muted: #8b95a9;
+  --accent: #3b82f6;
+  --accent-foreground: #ffffff;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-fresh-live: var(--fresh-live);
+  --color-fresh-recent: var(--fresh-recent);
+  --color-fresh-stale: var(--fresh-stale);
+  --color-fresh-offline: var(--fresh-offline);
+  --color-fresh-unknown: var(--fresh-unknown);
+  --color-type-pet: var(--type-pet);
+  --color-type-vehicle: var(--type-vehicle);
+  --color-type-device: var(--type-device);
+  --color-type-other: var(--type-other);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* MapLibre chrome follows the theme */
+.maplibregl-ctrl-group {
+  background: var(--surface) !important;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.1) !important;
+}
+.maplibregl-ctrl-group button + button {
+  border-top-color: var(--border) !important;
+}
+[data-theme="dark"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1) hue-rotate(180deg);
+}
+.maplibregl-popup-content {
+  background: var(--surface);
+  color: var(--foreground);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: var(--surface);
+}
+.maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--surface) 80%, transparent) !important;
+  color: var(--muted);
+  font-size: 10px;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--muted);
+}
+
+/* Thin scrollbars for the side panels */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
