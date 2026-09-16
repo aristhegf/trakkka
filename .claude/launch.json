@@ -9,8 +9,8 @@
     },
     {
       "name": "trakkka-verify",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev", "-p", "4128"],
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:verify"],
       "port": 4128
     }
   ]

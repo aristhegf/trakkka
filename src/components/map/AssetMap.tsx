@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Map, { Layer, NavigationControl, ScaleControl, Source, type LayerProps, type MapLayerMouseEvent, type MapRef } from "react-map-gl/maplibre";
-import type { GeoJSONSource } from "maplibre-gl";
+import type { GeoJSONSource, SkySpecification } from "maplibre-gl";
 import "@/lib/map/setup";
-import { Layers, LocateFixed, Maximize2, Satellite } from "lucide-react";
+import { Box, Layers, LocateFixed, Map as MapIcon, Maximize2, Satellite } from "lucide-react";
 import type { AssetOverview, AssetType, Freshness, Geofence, HistoryPoint } from "@/lib/types";
 import { DARK_STYLE, DEFAULT_VIEW, LABEL_FONT, LIGHT_STYLE, SATELLITE_AVAILABLE, satelliteStyle } from "@/lib/map/styles";
 import { MAP_PALETTE, iconId, registerAssetIcons } from "@/lib/map/icons";
@@ -12,6 +12,7 @@ import { bbox, circlePolygon, lerpLngLat, type LngLat } from "@/lib/geo";
 import { useResolvedTheme } from "@/components/kit/theme";
 import { Tooltip } from "@/components/motion/tooltip";
 import { cn } from "@/lib/utils";
+import { useStoredFlag } from "@/lib/use-stored-flag";
 
 export interface AssetMapProps {
   assets: AssetOverview[];
@@ -40,6 +41,35 @@ interface Anim {
 }
 
 const ANIM_MS = 900;
+
+/** OpenMapTiles vector source used by the OpenFreeMap styles; it carries building heights. */
+const BUILDING_SOURCE = "openmaptiles";
+const PITCH_3D = 55;
+const BEARING_3D = -17;
+
+/** Atmosphere around the globe; fades out as you zoom into a city so streets stay crisp. */
+const SKY: Record<"light" | "dark", SkySpecification> = {
+  dark: {
+    "sky-color": "#0b1a33",
+    "horizon-color": "#1e3a5f",
+    "fog-color": "#100f0d",
+    "sky-horizon-blend": 0.6,
+    "horizon-fog-blend": 0.5,
+    "fog-ground-blend": 0.4,
+    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 6, 1, 12, 0],
+  },
+  light: {
+    "sky-color": "#8ec5ff",
+    "horizon-color": "#dbeafe",
+    "fog-color": "#f5f3ee",
+    "sky-horizon-blend": 0.6,
+    "horizon-fog-blend": 0.5,
+    "fog-ground-blend": 0.4,
+    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 6, 1, 12, 0],
+  },
+};
+
+const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 const nowMs = () => performance.now();
 
 function animatedPos(a: Anim, t: number): LngLat {
@@ -75,6 +105,14 @@ export function AssetMap({
   const [me, setMe] = useState<{ lng: number; lat: number; accuracy: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const fittedRef = useRef(false);
+  const [hasBuildings, setHasBuildings] = useState(false);
+  // 3D (globe, tilt, buildings) is a per-browser preference, offered only on maps with tools; previews stay flat.
+  const [stored3d, setStored3d] = useStoredFlag("trakkka-map-3d");
+  const is3d = controls !== "none" && stored3d;
+  const is3dRef = useRef(is3d);
+  useEffect(() => {
+    is3dRef.current = is3d;
+  }, [is3d]);
 
   const baseStyle = useMemo(() => {
     if (satellite) return satelliteStyle() ?? (theme === "dark" ? DARK_STYLE : LIGHT_STYLE);
@@ -211,7 +249,7 @@ export function AssetMap({
     const b = bbox(pts);
     if (!b) return;
     if (pts.length === 1) map.flyTo({ center: [pts[0].lng, pts[0].lat], zoom: 15, duration: 600, padding });
-    else map.fitBounds(b, { padding, maxZoom: 16, duration: 600 });
+    else map.fitBounds(b, { padding, maxZoom: 16, duration: 600, pitch: map.getPitch(), bearing: map.getBearing() });
   }, [located, padding]);
 
   const locateMe = useCallback(() => {
@@ -247,18 +285,31 @@ export function AssetMap({
   useEffect(() => {
     if (!trail || trail.length < 2 || !loaded) return;
     const b = bbox(trail.map((p) => ({ lng: p.longitude, lat: p.latitude })));
-    if (b) mapRef.current?.fitBounds(b, { padding: 60, maxZoom: 16, duration: 600 });
+    const map = mapRef.current;
+    if (b && map) map.fitBounds(b, { padding: 60, maxZoom: 16, duration: 600, pitch: map.getPitch(), bearing: map.getBearing() });
   }, [trail, loaded]);
 
+  // Style switches drop custom images; re-register them. Satellite styles have no building heights.
   const register = useCallback(() => {
     const map = mapRef.current?.getMap();
-    if (map) registerAssetIcons(map);
+    if (!map) return;
+    registerAssetIcons(map);
+    setHasBuildings(Boolean(map.getSource(BUILDING_SOURCE)));
   }, []);
 
   const onLoad = useCallback(() => {
     register();
+    // A remembered 3D preference starts tilted, not just in globe projection.
+    if (is3dRef.current) mapRef.current?.getMap().jumpTo({ pitch: PITCH_3D, bearing: BEARING_3D });
     setLoaded(true);
   }, [register]);
+
+  // Tilt into 3D (or level out) from wherever the camera is; the projection follows the `projection` prop.
+  const toggle3d = useCallback(() => {
+    const next = !stored3d;
+    setStored3d(next);
+    mapRef.current?.easeTo({ pitch: next ? PITCH_3D : 0, bearing: next ? BEARING_3D : 0, duration: prefersReducedMotion() ? 0 : 900 });
+  }, [stored3d, setStored3d]);
 
   const onClick = useCallback(
     (e: MapLayerMouseEvent) => {
@@ -285,6 +336,22 @@ export function AssetMap({
   );
 
   const L: Record<string, LayerProps> = {
+    buildings: {
+      id: "buildings-3d",
+      type: "fill-extrusion",
+      source: BUILDING_SOURCE,
+      "source-layer": "building",
+      minzoom: 14,
+      filter: ["!=", ["get", "hide_3d"], true],
+      layout: { visibility: is3d ? "visible" : "none" },
+      paint: {
+        // Most Lagos buildings are only 3-10 m tall, so dark mode needs clear contrast or they read as nothing.
+        "fill-extrusion-color": theme === "dark" ? "#3a3833" : "#dcd7cc",
+        "fill-extrusion-height": ["coalesce", ["get", "render_height"], 0],
+        "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+        "fill-extrusion-opacity": theme === "dark" ? 0.9 : 0.8,
+      },
+    },
     placeFill: { id: "place-fill", type: "fill", source: "places", paint: { "fill-color": ["get", "color"], "fill-opacity": 0.1 } },
     placeLine: { id: "place-line", type: "line", source: "places", paint: { "line-color": ["get", "color"], "line-width": 1.5, "line-opacity": 0.8 } },
     placeLabel: {
@@ -368,6 +435,9 @@ export function AssetMap({
         onClick={onClick}
         interactiveLayerIds={loaded ? ["asset-points", "clusters"] : []}
         interactive={interactive}
+        projection={is3d ? "globe" : "mercator"}
+        sky={is3d ? SKY[theme] : undefined}
+        maxPitch={is3d ? 75 : 60}
         attributionControl={{ compact: true }}
         reuseMaps
         style={{ width: "100%", height: "100%" }}
@@ -380,6 +450,8 @@ export function AssetMap({
               <Layer {...L.placeLine} />
               <Layer {...L.placeLabel} />
             </Source>
+            {/* Always mounted when the style has building heights, toggled by visibility, and kept below every Trakkka layer. */}
+            {hasBuildings ? <Layer {...L.buildings} beforeId="place-fill" /> : null}
             {trailGeoJson ? (
               <Source id="trail" type="geojson" data={trailGeoJson}>
                 <Layer {...L.trailLine} />
@@ -408,7 +480,8 @@ export function AssetMap({
         ) : null}
         {controls === "full" ? (
           <>
-            <NavigationControl position="bottom-right" showCompass={false} />
+            {/* Built once by MapLibre, so the compass is always present rather than toggled with 3D. */}
+            <NavigationControl position="bottom-right" showCompass visualizePitch />
             <ScaleControl position="bottom-left" />
           </>
         ) : null}
@@ -421,6 +494,9 @@ export function AssetMap({
           </MapTool>
           <MapTool label="Show all assets" onClick={fitAll} disabled={located.length === 0}>
             <Maximize2 className="h-[18px] w-[18px]" />
+          </MapTool>
+          <MapTool label={is3d ? "Flat map" : "3D view"} onClick={toggle3d} active={is3d}>
+            {is3d ? <MapIcon className="h-[18px] w-[18px]" /> : <Box className="h-[18px] w-[18px]" />}
           </MapTool>
           {SATELLITE_AVAILABLE ? (
             <MapTool label={satellite ? "Street map" : "Satellite"} onClick={() => setSatellite((s) => !s)} active={satellite}>
