@@ -59,7 +59,7 @@ After the migrations:
 ## 4. Auth providers
 
 - **Email/password** works out of the box. Set Authentication → URL Configuration → Site URL to your app URL and add
-  `https://<your-domain>/auth/confirm` and `https://<your-domain>/auth/callback` (plus the `http://localhost:3000` equivalents) to Redirect URLs.
+  `https://<your-domain>/auth/confirm` and `https://<your-domain>/auth/callback` (plus the `http://localhost:4127` equivalents) to Redirect URLs.
 - **Google**: create an OAuth client in Google Cloud, add `https://<project-ref>.supabase.co/auth/v1/callback` as the redirect URI,
   and enter the client id/secret under Authentication → Providers → Google.
 - **Apple Sign In** is wired for later; it needs a paid Apple Developer account (Services ID, Team ID, Key ID, .p8).
@@ -71,7 +71,9 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000, sign up, and add an asset. Choose **Simulated tracker** as the tracking method to get a
+AssetWatch is pinned to **port 4127** on purpose (see the `dev`/`start` scripts in `package.json`), so it never
+collides with another project's default `:3000` dev server. Open http://localhost:4127, sign up, and add an
+asset. Choose **Simulated tracker** as the tracking method to get a
 device token, then stream fake Lagos data into the real ingest pipeline:
 
 ```bash
