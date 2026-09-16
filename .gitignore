@@ -34,6 +34,10 @@ yarn-error.log*
 .env*
 !.env.example
 
+# Supabase CLI local state (project ref, service version cache) — regenerated per machine by `supabase link`
+supabase/.temp/
+supabase/.branches/
+
 # vercel
 .vercel
 
