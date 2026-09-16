@@ -25,6 +25,7 @@ const geofenceInput = z.discriminatedUnion("kind", [
     id: z.string().uuid().nullable(),
     name: z.string().trim().min(1).max(60),
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
+    address: z.string().trim().max(200).nullable().optional(),
     center: z.object({ lat: z.number().gte(-90).lte(90), lng: z.number().gte(-180).lte(180) }),
     radius_m: z.number().min(20).max(50000),
   }),
@@ -33,6 +34,7 @@ const geofenceInput = z.discriminatedUnion("kind", [
     id: z.string().uuid().nullable(),
     name: z.string().trim().min(1).max(60),
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
+    address: z.string().trim().max(200).nullable().optional(),
     ring: z.array(z.tuple([z.number().gte(-180).lte(180), z.number().gte(-90).lte(90)])).min(3).max(200),
   }),
 ]);
@@ -55,11 +57,12 @@ export async function saveGeofence(input: GeofenceInput): Promise<ActionResult> 
     p_color: g.color,
     p_icon: null,
     p_is_active: true,
+    p_address: g.address ?? null,
   });
   if (error) return { error: error.message };
   revalidatePath("/geofences");
   revalidatePath("/dashboard");
-  return { id: data as string, message: "Geofence saved." };
+  return { id: data as string, message: "Place saved." };
 }
 
 export async function deleteGeofence(id: string): Promise<ActionResult> {
@@ -69,7 +72,7 @@ export async function deleteGeofence(id: string): Promise<ActionResult> {
   if (error) return { error: error.message };
   revalidatePath("/geofences");
   revalidatePath("/dashboard");
-  return { message: "Geofence deleted." };
+  return { message: "Place deleted." };
 }
 
 export async function setGeofenceAssignment(

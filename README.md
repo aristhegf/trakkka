@@ -90,6 +90,23 @@ npm run simulate -- --seed you@example.com --chaos
 `--chaos` injects duplicates, out-of-order fixes, (0,0) coordinates, future timestamps, batch uploads and an
 offline event so you can watch the ingest function reject, deduplicate and re-order them (`/admin` shows every outcome).
 
+### Places (Home, Office, Vet…)
+
+The **Places** page is where you register locations you care about. Each place is a circle or polygon, and
+any place can double as a geofence for arrival/departure alerts.
+
+- **Search an address or landmark** to position a place. Searches go through `/api/geocode`, which uses
+  OpenCage when `OPENCAGE_API_KEY` is set and falls back to OpenStreetMap's Nominatim otherwise (no key; fine
+  for personal use, search-on-submit only). OSM names some Lagos estates with Roman numerals
+  ("Lekki Phase I"), so a search for "Lekki Phase 1" is retried that way automatically.
+- **Use my location** positions the place wherever your phone or laptop is, which is the easiest way to tag
+  Home while you are standing in it.
+- Or click the map.
+
+Every place lists all your assets by distance with a live inside/outside badge, whether or not alerts are on
+for that asset. Tick **alerts** next to an asset to be notified when it arrives or leaves. The map's asset
+panel also shows the asset's nearest place ("At Home", or "Nearest place: Office, 2.9 km away").
+
 ## 6. Connecting a real GPS tracker (Traccar)
 
 1. Run Traccar (Docker or a VPS), point the tracker at it (GT06 → port 5023, Teltonika → 5027).

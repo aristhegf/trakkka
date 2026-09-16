@@ -22,11 +22,11 @@ export function GeofenceAssignments({ assetId }: { assetId: string }) {
   if (geofences.length === 0) {
     return (
       <p className="text-sm text-muted">
-        No geofences yet.{" "}
+        No places yet.{" "}
         <Link href="/geofences" className="text-accent hover:underline">
           Create one
         </Link>{" "}
-        (Home, Office, Vet…) and assign this asset to get enter/exit alerts.
+        (Home, Office, Vet…) and turn on alerts for this asset to know when it arrives or leaves.
       </p>
     );
   }

@@ -191,6 +191,8 @@ export interface Geofence {
   icon: string | null;
   is_active: boolean;
   radius_m: number | null;
+  /** Human-readable address the user searched for or typed; null when placed by map click / GPS. */
+  address: string | null;
   center: { lat: number; lng: number } | null;
   geometry: GeoJSON.Polygon;
   assets: GeofenceAssetLink[];

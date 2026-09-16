@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { GeofencesView } from "@/components/geofences/GeofencesView";
 
-export const metadata = { title: "Geofences" };
+export const metadata = { title: "Places" };
 
 export default async function GeofencesPage() {
   const supabase = await createClient();

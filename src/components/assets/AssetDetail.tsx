@@ -26,7 +26,7 @@ export type DetailTab = "overview" | "history" | "geofences" | "alerts" | "setti
 const TABS: { key: DetailTab; label: string }[] = [
   { key: "overview", label: "Overview" },
   { key: "history", label: "History" },
-  { key: "geofences", label: "Geofences" },
+  { key: "geofences", label: "Places" },
   { key: "alerts", label: "Alerts" },
   { key: "settings", label: "Settings" },
 ];
