@@ -20,7 +20,7 @@ export interface NotificationChannel {
   send(alert: Alert, recipient: Recipient, assetName: string | null): Promise<SendResult>;
 }
 
-const appUrl = () => process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const appUrl = () => process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4127";
 
 export const emailChannel: NotificationChannel = {
   key: "email",

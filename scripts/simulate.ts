@@ -3,10 +3,10 @@
  *
  * Two ways to run:
  *   1. With device tokens you already have (no DB access needed):
- *        npm run simulate -- --url http://localhost:3000 --token awd_xxx[:vehicle|pet|device] --token awd_yyy:pet
+ *        npm run simulate -- --url http://localhost:4127 --token awd_xxx[:vehicle|pet|device] --token awd_yyy:pet
  *   2. Seed mode (needs SUPABASE_SERVICE_ROLE_KEY in .env.local): creates "Toyota", "Milo" and "iPhone"
  *      for a user and streams to them:
- *        npm run simulate -- --seed you@example.com --url http://localhost:3000
+ *        npm run simulate -- --seed you@example.com --url http://localhost:4127
  *
  * Options: --interval 5 (seconds between fixes), --duration 600 (seconds, 0 = forever), --chaos (inject duplicates,
  * out-of-order, bad coordinates, future timestamps), --quiet.
@@ -39,7 +39,7 @@ function loadEnv() {
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000", tokens: [], seed: null, interval: 5, duration: 0, chaos: false, quiet: false };
+  const a: Args = { url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4127", tokens: [], seed: null, interval: 5, duration: 0, chaos: false, quiet: false };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     const v = argv[i + 1];
