@@ -65,7 +65,8 @@ export async function ingestRecords(
     }
     const r = data as RpcResult;
     outcomes.push({ status: r.status, reason: r.reason, location_id: r.location_id, asset_id: r.asset_id });
-    if ((r.status === "accepted" || r.status === "sampled") && r.place_changed && r.latitude != null && r.longitude != null) {
+    // Any accepted fix is a candidate; below we skip the lookup when the asset already has a label for this cell.
+    if ((r.status === "accepted" || r.status === "sampled") && r.latitude != null && r.longitude != null) {
       geocodeTargets.push({ lat: r.latitude, lng: r.longitude });
     }
   }
@@ -82,10 +83,12 @@ export async function ingestRecords(
     else outcomes.push({ status: (data as RpcResult).status, reason: (data as RpcResult).reason });
   }
 
-  // Only the latest place matters; geocode once per request.
+  // Only the latest place matters; geocode once per request, and only when the label is missing for this cell
+  // (new area, or an asset that never had one, e.g. a phone that has not moved since it was added).
   const last = geocodeTargets.at(-1);
   if (last) {
-    await reverseGeocodeAndStore(admin, ctx.assetId, last.lat, last.lng).catch(() => undefined);
+    const { data: state } = await admin.from("asset_states").select("place_label").eq("asset_id", ctx.assetId).maybeSingle();
+    if (!state?.place_label) await reverseGeocodeAndStore(admin, ctx.assetId, last.lat, last.lng).catch(() => undefined);
   }
   return outcomes;
 }

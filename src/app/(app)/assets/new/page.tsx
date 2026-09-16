@@ -1,15 +1,13 @@
 import { AssetForm } from "@/components/assets/AssetForm";
-import { PageHeader } from "@/components/shell/PageHeader";
+import { Page, PageHeader } from "@/components/kit/page";
 
 export const metadata = { title: "Add asset" };
 
 export default function NewAssetPage() {
   return (
-    <div className="scroll-thin h-full overflow-y-auto">
-      <div className="mx-auto max-w-2xl p-4 md:p-8">
-        <PageHeader title="Add an asset" description="Only register devices, pets and vehicles you own. Location data stays private to your account." backHref="/dashboard" />
-        <AssetForm mode="create" />
-      </div>
-    </div>
+    <Page>
+      <PageHeader title="Add something to track" description="Only add phones, pets and vehicles you own or have permission to track. Locations stay private to your account." backHref="/dashboard" backLabel="Map" />
+      <AssetForm mode="create" />
+    </Page>
   );
 }

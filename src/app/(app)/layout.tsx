@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient, getUser } from "@/lib/supabase/server";
 import { loadSnapshot } from "@/lib/data/queries";
 import { AssetStoreProvider } from "@/components/store/AssetStore";
-import { ThemeProvider } from "@/components/shell/ThemeProvider";
 import { AppShell } from "@/components/shell/AppShell";
+import { ToastProvider } from "@/components/kit/toast";
 
 /** Render-time clock seed for the client store, so "x s ago" hydrates identically. */
 const serverNow = () => Date.now();
@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const supabase = await createClient();
   const snap = await loadSnapshot(supabase);
   return (
-    <ThemeProvider>
+    <ToastProvider>
       <AssetStoreProvider
         userId={user.id}
         initialAssets={snap.assets}
@@ -28,6 +28,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {children}
         </AppShell>
       </AssetStoreProvider>
-    </ThemeProvider>
+    </ToastProvider>
   );
 }

@@ -15,6 +15,17 @@ const eslintConfig = defineConfig([
     // Minified MapLibre worker bundles copied from node_modules (scripts/copy-map-worker.mjs).
     "public/maplibre/**",
   ]),
+  {
+    // beui.dev components, copied in unmodified by `npx shadcn add @beui/...` so they can be re-synced. They predate
+    // the React Compiler lint rules; keep those rules strict for our own code only.
+    files: ["src/components/motion/**", "src/lib/hooks/**"],
+    rules: {
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/immutability": "off",
+      "react-hooks/preserve-manual-memoization": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;
