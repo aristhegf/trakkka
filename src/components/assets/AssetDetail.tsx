@@ -60,7 +60,7 @@ export function AssetDetail({
   rules: RuleRow[];
   recentAlerts: Alert[];
 }) {
-  const { assets, freshnessOf, now, providers } = useAssetStore();
+  const { assets, freshnessOf, now, providers, timezone } = useAssetStore();
   const asset = assets[initialAsset.id] ?? initialAsset; // live copy from the store when present
   const freshness = freshnessOf(asset);
   const provider = asset.tracking_provider_key ? providers[asset.tracking_provider_key] : undefined;
@@ -116,7 +116,7 @@ export function AssetDetail({
               <dl className="grid grid-cols-2 gap-2 text-sm">
                 <Item label="Current status" value={!asset.last_location_at ? "No location yet" : asset.movement_state === "moving" ? "Moving" : asset.movement_state === "stationary" ? "Stationary" : "Unknown"} />
                 <Item label="Location" value={asset.place_label ?? (asset.latitude != null ? "Unnamed area" : "—")} sub={coordLabel(asset.latitude, asset.longitude)} />
-                <Item label="Last updated" value={asset.last_location_at ? relativeTime(asset.last_location_at, now) : "—"} sub={asset.last_location_at ? formatDateTime(asset.last_location_at) : undefined} />
+                <Item label="Last updated" value={asset.last_location_at ? relativeTime(asset.last_location_at, now) : "—"} sub={asset.last_location_at ? formatDateTime(asset.last_location_at, timezone) : undefined} />
                 <Item label="Accuracy" value={asset.last_location_at ? formatAccuracy(asset.accuracy_m) : "—"} />
                 {provider?.capabilities.battery ? <Item label="Battery" value={asset.battery_level != null ? `${asset.battery_level}%` : "—"} /> : null}
                 {asset.type === "vehicle" ? <Item label="Speed" value={formatSpeedKph(asset.speed_mps)} /> : null}
@@ -177,6 +177,7 @@ function ProfileCard({ title, rows }: { title: string; rows: [string, string | n
 }
 
 function SettingsTab({ asset, devices, onChanged }: { asset: AssetOverview; devices: AssetDevice[]; onChanged: () => void }) {
+  const { now } = useAssetStore();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [token, setToken] = useState<{ token: string; providerKey: string } | null>(null);
@@ -237,7 +238,7 @@ function SettingsTab({ asset, devices, onChanged }: { asset: AssetOverview; devi
                 </p>
                 <p className="text-xs text-muted">
                   {d.tracker_model ? `${d.tracker_model} · ` : ""}
-                  {d.status} · last sync {d.last_sync_at ? relativeTime(d.last_sync_at) : "never"}
+                  {d.status} · last sync {d.last_sync_at ? relativeTime(d.last_sync_at, now) : "never"}
                   {d.last_error ? ` · last error: ${d.last_error}` : ""}
                 </p>
               </div>

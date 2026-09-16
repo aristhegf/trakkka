@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Map, { Layer, NavigationControl, Source, type MapLayerMouseEvent, type MapRef } from "react-map-gl/maplibre";
+import "@/lib/map/setup";
 import { useAssetStore } from "@/components/store/AssetStore";
 import { useTheme } from "@/components/shell/ThemeProvider";
 import { DARK_STYLE, DEFAULT_VIEW, LABEL_FONT, LIGHT_STYLE } from "@/lib/map/styles";

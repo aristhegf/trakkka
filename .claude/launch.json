@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 4127
+    },
+    {
+      "name": "assetwatch-verify",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev", "-p", "4128"],
+      "port": 4128
     }
   ]
 }

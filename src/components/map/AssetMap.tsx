@@ -12,6 +12,7 @@ import Map, {
   type MapRef,
 } from "react-map-gl/maplibre";
 import type { GeoJSONSource } from "maplibre-gl";
+import "@/lib/map/setup";
 import { Layers, Maximize2, Satellite } from "lucide-react";
 import type { AssetOverview, AssetType, Freshness, Geofence, HistoryPoint } from "@/lib/types";
 import { DARK_STYLE, DEFAULT_VIEW, LABEL_FONT, LIGHT_STYLE, SATELLITE_AVAILABLE, satelliteStyle } from "@/lib/map/styles";

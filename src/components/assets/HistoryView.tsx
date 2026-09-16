@@ -41,7 +41,7 @@ function rangeBounds(r: Range, custom: { from: string; to: string }): { from: Da
 }
 
 export function HistoryView({ asset }: { asset: AssetOverview }) {
-  const { freshnessOf, geofences } = useAssetStore();
+  const { freshnessOf, geofences, timezone } = useAssetStore();
   const [range, setRange] = useState<Range>("today");
   const [custom, setCustom] = useState({ from: "", to: "" });
   const supabase = useMemo(() => createClient(), []);
@@ -114,7 +114,7 @@ export function HistoryView({ asset }: { asset: AssetOverview }) {
             {asset.type === "vehicle" ? <Stat label="Avg moving speed" value={formatSpeedKph(stats?.avg_moving_speed_mps)} /> : null}
             <Stat label="Stops" value={String(stops.length)} />
             <Stat label="Fixes" value={String(stats?.point_count ?? 0)} />
-            {asset.type === "pet" && home && homeLink ? <Stat label="Home" value={homeLink.is_inside ? "Inside" : homeLink.is_inside === false ? `Away${homeLink.last_transition_at ? ` since ${formatTime(homeLink.last_transition_at)}` : ""}` : "Unknown"} /> : null}
+            {asset.type === "pet" && home && homeLink ? <Stat label="Home" value={homeLink.is_inside ? "Inside" : homeLink.is_inside === false ? `Away${homeLink.last_transition_at ? ` since ${formatTime(homeLink.last_transition_at, timezone)}` : ""}` : "Unknown"} /> : null}
           </dl>
 
           {stops.length > 0 ? (
@@ -124,7 +124,7 @@ export function HistoryView({ asset }: { asset: AssetOverview }) {
                 {stops.map((s, i) => (
                   <li key={i} className="flex justify-between px-3 py-1.5">
                     <span>
-                      {formatTime(s.started_at)} – {formatTime(s.ended_at)}
+                      {formatTime(s.started_at, timezone)} – {formatTime(s.ended_at, timezone)}
                     </span>
                     <span className="text-muted">{formatDuration(s.duration_s)}</span>
                   </li>
@@ -141,7 +141,7 @@ export function HistoryView({ asset }: { asset: AssetOverview }) {
               <ul className="scroll-thin max-h-72 divide-y divide-border overflow-y-auto text-xs">
                 {[...points].reverse().slice(0, 300).map((p) => (
                   <li key={p.id} className="flex items-center justify-between gap-2 px-3 py-1.5">
-                    <span className="font-medium">{formatDateTime(p.recorded_at)}</span>
+                    <span className="font-medium">{formatDateTime(p.recorded_at, timezone)}</span>
                     <span className="truncate text-muted">
                       {p.latitude.toFixed(4)}, {p.longitude.toFixed(4)}
                       {p.accuracy_m != null ? ` ±${Math.round(p.accuracy_m)}m` : ""}

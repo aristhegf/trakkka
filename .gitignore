@@ -38,6 +38,9 @@ yarn-error.log*
 supabase/.temp/
 supabase/.branches/
 
+# MapLibre worker bundles, copied from node_modules by scripts/copy-map-worker.mjs on predev/prebuild
+public/maplibre/
+
 # vercel
 .vercel
 

@@ -92,6 +92,8 @@ function reducer(state: State, action: Action): State {
 
 interface AssetStoreValue extends State {
   now: Date;
+  /** IANA timezone from the user's profile; used for every absolute timestamp so SSR and client agree. */
+  timezone: string;
   assetList: AssetOverview[];
   freshnessOf: (a: AssetOverview) => ReturnType<typeof deriveFreshness>;
   refresh: () => Promise<void>;
@@ -105,6 +107,8 @@ export function AssetStoreProvider({
   initialAlerts,
   initialGeofences,
   providers,
+  initialNow,
+  timezone,
   children,
 }: {
   userId: string;
@@ -112,6 +116,9 @@ export function AssetStoreProvider({
   initialAlerts: Alert[];
   initialGeofences: Geofence[];
   providers: TrackingProviderRow[];
+  /** Server render time (ms). Seeding the clock from it keeps "x s ago" identical during hydration. */
+  initialNow: number;
+  timezone: string;
   children: React.ReactNode;
 }) {
   const [state, dispatch] = useReducer(reducer, undefined, () => ({
@@ -122,7 +129,7 @@ export function AssetStoreProvider({
     connected: false,
     lastEventAt: null,
   }));
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState(() => new Date(initialNow));
   const supabase = useMemo(() => createClient(), []);
   const initialRef = useRef({ initialAssets, initialAlerts, initialGeofences });
 
@@ -139,9 +146,14 @@ export function AssetStoreProvider({
   }, [initialAssets, initialAlerts, initialGeofences]);
 
   // 1 s tick so freshness badges and "x s ago" labels stay honest without any server event.
+  // The first tick runs right after mount (from a callback, so hydration has already matched).
   useEffect(() => {
+    const first = setTimeout(() => setNow(new Date()), 0);
     const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
   }, []);
 
   const refresh = useCallback(async () => {
@@ -189,11 +201,12 @@ export function AssetStoreProvider({
     return {
       ...state,
       now,
+      timezone,
       assetList,
       freshnessOf: (a) => deriveFreshness(a.last_location_at, a.connection_status, thresholdsFrom(a), now),
       refresh,
     };
-  }, [state, now, refresh]);
+  }, [state, now, timezone, refresh]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
