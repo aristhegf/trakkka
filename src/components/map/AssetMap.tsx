@@ -11,15 +11,16 @@ import Map, {
   type MapLayerMouseEvent,
   type MapRef,
 } from "react-map-gl/maplibre";
-import type { GeoJSONSource } from "maplibre-gl";
+import type { GeoJSONSource, SkySpecification } from "maplibre-gl";
 import "@/lib/map/setup";
-import { Layers, Maximize2, Satellite } from "lucide-react";
+import { Box, Layers, Map as MapIcon, Maximize2, Satellite } from "lucide-react";
 import type { AssetOverview, AssetType, Freshness, Geofence, HistoryPoint } from "@/lib/types";
 import { DARK_STYLE, DEFAULT_VIEW, LABEL_FONT, LIGHT_STYLE, SATELLITE_AVAILABLE, satelliteStyle } from "@/lib/map/styles";
 import { iconId, registerAssetIcons } from "@/lib/map/icons";
 import { bbox, circlePolygon, lerpLngLat, type LngLat } from "@/lib/geo";
 import { useTheme } from "@/components/shell/ThemeProvider";
 import { cn } from "@/lib/cn";
+import { useStoredFlag } from "@/lib/use-stored-flag";
 
 export interface AssetMapProps {
   assets: AssetOverview[];
@@ -43,6 +44,35 @@ interface Anim {
 }
 
 const ANIM_MS = 900;
+
+/** OpenMapTiles vector source used by the OpenFreeMap styles; it carries building heights. */
+const BUILDING_SOURCE = "openmaptiles";
+const PITCH_3D = 55;
+const BEARING_3D = -17;
+
+/** Atmosphere around the globe; fades out as you zoom into a city so streets stay crisp. */
+const SKY: Record<"light" | "dark", SkySpecification> = {
+  dark: {
+    "sky-color": "#0b1a33",
+    "horizon-color": "#1e3a5f",
+    "fog-color": "#0b0f17",
+    "sky-horizon-blend": 0.6,
+    "horizon-fog-blend": 0.5,
+    "fog-ground-blend": 0.4,
+    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 6, 1, 12, 0],
+  },
+  light: {
+    "sky-color": "#8ec5ff",
+    "horizon-color": "#dbeafe",
+    "fog-color": "#f6f7f9",
+    "sky-horizon-blend": 0.6,
+    "horizon-fog-blend": 0.5,
+    "fog-ground-blend": 0.4,
+    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 6, 1, 12, 0],
+  },
+};
+
+const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 const nowMs = () => performance.now();
 
 /** Eased position of an in-flight animation at time t. */
@@ -73,7 +103,15 @@ export function AssetMap({
   const { theme } = useTheme();
   const [satellite, setSatellite] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [hasBuildings, setHasBuildings] = useState(false);
   const fittedRef = useRef(false);
+  // 3D is a per-browser preference, offered only on full maps (the small asset-page maps stay flat).
+  const [stored3d, setStored3d] = useStoredFlag("trakkka-map-3d");
+  const is3d = showControls && stored3d;
+  const is3dRef = useRef(is3d);
+  useEffect(() => {
+    is3dRef.current = is3d;
+  }, [is3d]);
 
   const baseStyle = useMemo(() => {
     if (satellite) return satelliteStyle() ?? (theme === "dark" ? DARK_STYLE : LIGHT_STYLE);
@@ -204,8 +242,9 @@ export function AssetMap({
     const pts = located.map((a) => ({ lng: a.longitude!, lat: a.latitude! }));
     const b = bbox(pts);
     if (!b) return;
-    if (pts.length === 1) map.flyTo({ center: [pts[0].lng, pts[0].lat], zoom: 15, duration: 600 });
-    else map.fitBounds(b, { padding: 80, maxZoom: 16, duration: 600 });
+    const camera = { pitch: map.getPitch(), bearing: map.getBearing() };
+    if (pts.length === 1) map.flyTo({ center: [pts[0].lng, pts[0].lat], zoom: 15, duration: 600, ...camera });
+    else map.fitBounds(b, { padding: 80, maxZoom: 16, duration: 600, ...camera });
   }, [located]);
 
   useEffect(() => {
@@ -226,21 +265,34 @@ export function AssetMap({
   useEffect(() => {
     if (!trail || trail.length < 2 || !loaded) return;
     const b = bbox(trail.map((p) => ({ lng: p.longitude, lat: p.latitude })));
-    if (b) mapRef.current?.fitBounds(b, { padding: 60, maxZoom: 16, duration: 600 });
+    const map = mapRef.current;
+    if (b && map) map.fitBounds(b, { padding: 60, maxZoom: 16, duration: 600, pitch: map.getPitch(), bearing: map.getBearing() });
   }, [trail, loaded]);
 
   const onLoad = useCallback(() => {
     const map = mapRef.current?.getMap();
     if (!map) return;
     registerAssetIcons(map);
+    setHasBuildings(Boolean(map.getSource(BUILDING_SOURCE)));
+    // A remembered 3D preference starts tilted, not just in globe projection.
+    if (is3dRef.current) map.jumpTo({ pitch: PITCH_3D, bearing: BEARING_3D });
     setLoaded(true);
   }, []);
 
-  // Style switches drop custom images; re-register them.
+  // Style switches drop custom images; re-register them. Satellite styles have no building heights.
   const onStyleData = useCallback(() => {
     const map = mapRef.current?.getMap();
-    if (map) registerAssetIcons(map);
+    if (!map) return;
+    registerAssetIcons(map);
+    setHasBuildings(Boolean(map.getSource(BUILDING_SOURCE)));
   }, []);
+
+  // Tilt into 3D (or level out) from wherever the camera is; the projection itself follows the `projection` prop.
+  const toggle3d = useCallback(() => {
+    const next = !stored3d;
+    setStored3d(next);
+    mapRef.current?.easeTo({ pitch: next ? PITCH_3D : 0, bearing: next ? BEARING_3D : 0, duration: prefersReducedMotion() ? 0 : 900 });
+  }, [stored3d, setStored3d]);
 
   const onClick = useCallback(
     (e: MapLayerMouseEvent) => {
@@ -359,6 +411,22 @@ export function AssetMap({
     layout: { "text-field": ["get", "name"], "text-font": LABEL_FONT, "text-size": 11, "symbol-placement": "line", "text-letter-spacing": 0.05 },
     paint: { "text-color": ["get", "color"], "text-halo-color": theme === "dark" ? "#0b0f17" : "#ffffff", "text-halo-width": 1.5 },
   };
+  const buildings3d: LayerProps = {
+    id: "buildings-3d",
+    type: "fill-extrusion",
+    source: BUILDING_SOURCE,
+    "source-layer": "building",
+    minzoom: 14,
+    filter: ["!=", ["get", "hide_3d"], true],
+    layout: { visibility: is3d ? "visible" : "none" },
+    paint: {
+      // Dark mode needs visible contrast: most Lagos buildings are only 3-10 m tall, so faint blocks read as nothing.
+      "fill-extrusion-color": theme === "dark" ? "#34425e" : "#d9d6cf",
+      "fill-extrusion-height": ["coalesce", ["get", "render_height"], 0],
+      "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+      "fill-extrusion-opacity": theme === "dark" ? 0.9 : 0.8,
+    },
+  };
   const trailLine: LayerProps = { id: "trail-line", type: "line", source: "trail", filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#2563eb", "line-width": 3, "line-opacity": 0.8 }, layout: { "line-join": "round", "line-cap": "round" } };
   const trailStart: LayerProps = { id: "trail-start", type: "circle", source: "trail", filter: ["==", ["get", "kind"], "start"], paint: { "circle-radius": 5, "circle-color": "#ffffff", "circle-stroke-color": "#2563eb", "circle-stroke-width": 2 } };
 
@@ -373,6 +441,9 @@ export function AssetMap({
         onClick={onClick}
         interactiveLayerIds={loaded ? ["asset-points", "clusters"] : []}
         interactive={interactive}
+        projection={is3d ? "globe" : "mercator"}
+        sky={is3d ? SKY[theme === "dark" ? "dark" : "light"] : undefined}
+        maxPitch={is3d ? 75 : 60}
         attributionControl={{ compact: true }}
         reuseMaps
         style={{ width: "100%", height: "100%" }}
@@ -385,6 +456,8 @@ export function AssetMap({
               <Layer {...geofenceLine} />
               <Layer {...geofenceLabel} />
             </Source>
+            {/* Always mounted when the style has building heights, toggled by visibility, and kept below every Trakkka layer. */}
+            {hasBuildings ? <Layer {...buildings3d} beforeId="geofence-fill" /> : null}
             {trailGeoJson ? (
               <Source id="trail" type="geojson" data={trailGeoJson}>
                 <Layer {...trailLine} />
@@ -407,16 +480,21 @@ export function AssetMap({
         ) : null}
         {showControls ? (
           <>
-            <NavigationControl position="top-right" showCompass={false} />
+            {/* Controls are built once by MapLibre, so the compass is always shown rather than toggled with 3D. */}
+            <NavigationControl position="top-right" showCompass visualizePitch />
             <GeolocateControl position="top-right" trackUserLocation={false} showUserLocation />
             <ScaleControl position="bottom-right" />
           </>
         ) : null}
       </Map>
       {showControls ? (
-        <div className="absolute right-2.5 top-[92px] flex flex-col gap-1.5">
+        <div className="absolute right-2.5 top-[150px] flex flex-col gap-1.5">
+          {/* Below MapLibre's top-right stack: zoom + compass (10-99px) and geolocate (109-140px), plus its 10px gap. */}
           <MapButton label="Fit all assets" onClick={fitAll}>
             <Maximize2 className="h-4 w-4" />
+          </MapButton>
+          <MapButton label={is3d ? "Flat map view" : "3D view: globe, tilt and buildings"} onClick={toggle3d} active={is3d}>
+            {is3d ? <MapIcon className="h-4 w-4" /> : <Box className="h-4 w-4" />}
           </MapButton>
           <MapButton
             label={SATELLITE_AVAILABLE ? (satellite ? "Map view" : "Satellite view") : "Satellite view needs a tile key (see .env.example)"}
