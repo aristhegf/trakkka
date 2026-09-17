@@ -27,7 +27,7 @@ export function LoginForm({ next }: { next: string }) {
         <div>
           <Input label="Password" name="password" type="password" autoComplete="current-password" required leftIcon={<Lock />} error={state?.error} />
           <div className="mt-1.5 flex justify-end">
-            <Link href="/forgot-password" className="px-1 text-sm text-primary hover:underline">
+            <Link href="/forgot-password" className="inline-flex min-h-11 items-center px-1 text-sm text-primary hover:underline">
               Forgot password?
             </Link>
           </div>

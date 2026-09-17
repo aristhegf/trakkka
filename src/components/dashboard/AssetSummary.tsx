@@ -40,7 +40,7 @@ export function AssetSummary({ asset, freshness, onClose }: { asset: AssetOvervi
           </div>
         </div>
         {onClose ? (
-          <button type="button" onClick={onClose} aria-label="Close" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
+          <button type="button" onClick={onClose} aria-label="Close" className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         ) : null}
@@ -86,7 +86,7 @@ export function AssetSummary({ asset, freshness, onClose }: { asset: AssetOvervi
               <Navigation className="h-4 w-4" /> Directions
             </ButtonLink>
           ) : null}
-          <Link href={`/assets/${asset.id}`} className="inline-flex h-10 flex-1 items-center justify-center gap-1 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+          <Link href={`/assets/${asset.id}`} className="inline-flex h-11 flex-1 items-center justify-center gap-1 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             Details <ChevronRight className="h-4 w-4" />
           </Link>
         </div>
@@ -106,7 +106,7 @@ export function AssetSummary({ asset, freshness, onClose }: { asset: AssetOvervi
           { href: `/assets/${asset.id}?tab=alerts`, label: "Alerts" },
           { href: `/assets/${asset.id}?tab=settings`, label: "Settings" },
         ].map((l) => (
-          <Link key={l.href} href={l.href} className="inline-flex h-9 items-center gap-1 rounded-full border border-border px-3.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+          <Link key={l.href} href={l.href} className="inline-flex h-11 items-center gap-1 rounded-full border border-border px-3.5 text-muted-foreground hover:bg-muted hover:text-foreground">
             {l.label} <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
         ))}

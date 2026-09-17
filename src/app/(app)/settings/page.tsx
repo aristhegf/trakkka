@@ -7,7 +7,7 @@ export default async function SettingsPage() {
   const user = await getUser();
   const supabase = await createClient();
   const [{ data: profile }, { data: prefs }, { data: audit }] = await Promise.all([
-    supabase.from("profiles").select("display_name, timezone").maybeSingle(),
+    supabase.from("profiles").select("display_name, timezone, is_admin").maybeSingle(),
     supabase.from("notification_preferences").select("email, push").maybeSingle(),
     supabase.from("audit_logs").select("id, action, target_table, target_id, created_at").order("created_at", { ascending: false }).limit(30),
   ]);
@@ -20,6 +20,7 @@ export default async function SettingsPage() {
       emailAlerts={prefs?.email ?? true}
       hasPassword={!providers || providers.includes("email")}
       audit={audit ?? []}
+      isAdmin={Boolean(profile?.is_admin)}
     />
   );
 }

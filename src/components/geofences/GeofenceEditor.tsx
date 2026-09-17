@@ -217,7 +217,7 @@ export function GeofenceEditor({ draft, onChange, onCancel, onSave, saving, clas
           <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border md:hidden" aria-hidden />
           <div className="mb-3 flex items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">{draft.id ? "Edit place" : "New place"}</h2>
-            <button type="button" onClick={onCancel} aria-label="Close" className="grid h-10 w-10 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
+            <button type="button" onClick={onCancel} aria-label="Close" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -227,10 +227,10 @@ export function GeofenceEditor({ draft, onChange, onCancel, onSave, saving, clas
 
             <Tabs value={draft.kind} onValueChange={(v) => onChange({ ...draft, kind: v as Draft["kind"] })} variant="segment">
               <TabsList className="grid w-full grid-cols-2 bg-muted p-1">
-                <TabsTrigger value="circle" className="h-9 w-full">
+                <TabsTrigger value="circle" className="h-11 w-full">
                   Around a point
                 </TabsTrigger>
-                <TabsTrigger value="polygon" className="h-9 w-full">
+                <TabsTrigger value="polygon" className="h-11 w-full">
                   Draw an area
                 </TabsTrigger>
               </TabsList>
@@ -294,7 +294,7 @@ export function GeofenceEditor({ draft, onChange, onCancel, onSave, saving, clas
                   <RangeSlider min={20} max={5000} step={10} value={draft.radius_m} onValueChange={(v) => onChange({ ...draft, radius_m: v })} showTicks={false} formatValueText={(v) => `${v} metres`} />
                   <div className="flex gap-1.5">
                     {RADIUS_PRESETS.map((r) => (
-                      <button key={r} type="button" onClick={() => onChange({ ...draft, radius_m: r })} className={cn("h-9 flex-1 rounded-full border text-xs font-medium transition-colors", draft.radius_m === r ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground")}>
+                      <button key={r} type="button" onClick={() => onChange({ ...draft, radius_m: r })} className={cn("h-11 flex-1 rounded-full border text-xs font-medium transition-colors", draft.radius_m === r ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground")}>
                         {formatDistance(r)}
                       </button>
                     ))}
@@ -311,7 +311,7 @@ export function GeofenceEditor({ draft, onChange, onCancel, onSave, saving, clas
               <FieldLabel>Colour</FieldLabel>
               <div className="flex gap-2 px-1">
                 {PLACE_COLORS.map((c) => (
-                  <button key={c} type="button" aria-label={`Colour ${c}`} aria-pressed={draft.color === c} onClick={() => onChange({ ...draft, color: c })} className={cn("h-9 w-9 rounded-full ring-offset-2 ring-offset-card transition-shadow", draft.color === c && "ring-2 ring-foreground")} style={{ background: c }} />
+                  <button key={c} type="button" aria-label={`Colour ${c}`} aria-pressed={draft.color === c} onClick={() => onChange({ ...draft, color: c })} className={cn("h-11 w-11 rounded-full ring-offset-2 ring-offset-card transition-shadow", draft.color === c && "ring-2 ring-foreground")} style={{ background: c }} />
                 ))}
               </div>
             </div>

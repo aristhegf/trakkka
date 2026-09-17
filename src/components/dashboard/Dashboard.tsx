@@ -16,6 +16,7 @@ import { AnimatedNumber } from "@/components/motion/animated-number";
 import { EmptyState } from "@/components/kit/page";
 import { LogoMark } from "@/components/shell/AppShell";
 import { useIsPhone } from "@/components/kit/media";
+import { useBackToClose } from "@/components/kit/back";
 import { describeWhere } from "@/lib/describe";
 import type { AssetOverview, Freshness } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -66,7 +67,6 @@ export function Dashboard() {
     setSelectedId(id);
     if (focus) setFocusId(id);
     if (id) setListOpen(false);
-    window.history.replaceState(null, "", id ? `/dashboard?asset=${id}` : "/dashboard");
   }, []);
 
   const sorted = useMemo(
@@ -112,6 +112,10 @@ export function Dashboard() {
   );
 
   const selected = selectedId ? assetList.find((a) => a.id === selectedId) ?? null : null;
+
+  // Phone: Back closes the open sheet instead of leaving the map. Desktop panels are not overlays.
+  useBackToClose(isPhone && listOpen, () => setListOpen(false));
+  useBackToClose(isPhone && Boolean(selected), () => select(null, false));
   const summaryLine = counts.total === 0 ? "No assets yet" : `${counts.live} of ${counts.total} reporting${counts.moving ? ` · ${counts.moving} moving` : ""}`;
 
   const list = (
@@ -128,7 +132,7 @@ export function Dashboard() {
     <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)} variant="pill">
       <TabsList className="no-scrollbar flex max-w-full overflow-x-auto bg-muted">
         {FILTERS.map((f) => (
-          <TabsTrigger key={f.key} value={f.key} className="px-3 text-[13px]">
+          <TabsTrigger key={f.key} value={f.key} className="h-11 px-3 text-[13px]">
             {f.label}
             {f.key === "attention" && counts.attention > 0 ? ` (${counts.attention})` : ""}
           </TabsTrigger>

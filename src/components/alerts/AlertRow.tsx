@@ -42,7 +42,7 @@ export function AlertRow({ alert, now, assetName, onAcknowledge, as = "li" }: { 
         </p>
       </div>
       {onAcknowledge && open ? (
-        <Button variant="secondary" size="sm" className="h-9 shrink-0" onClick={onAcknowledge} aria-label={`Mark "${alert.title}" as seen`}>
+        <Button variant="secondary" size="sm" className="h-11 shrink-0 px-3.5" onClick={onAcknowledge} aria-label={`Mark "${alert.title}" as seen`}>
           <Check className="h-3.5 w-3.5" /> Seen
         </Button>
       ) : null}

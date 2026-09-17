@@ -91,7 +91,7 @@ export function AssetDetail({
         backHref="/dashboard"
         backLabel="Map"
         actions={
-          <NavButton href={`/assets/${asset.id}/edit`} variant="secondary" size="sm" className="h-10 px-4">
+          <NavButton href={`/assets/${asset.id}/edit`} variant="secondary" size="sm" className="h-11 px-4">
             <Pencil /> Edit
           </NavButton>
         }
@@ -148,7 +148,7 @@ function Overview({ asset, pet, vehicle, device }: { asset: AssetOverview; pet: 
       <div className="space-y-4 md:col-span-3">
         <div className="relative h-64 overflow-hidden rounded-3xl border border-border md:h-[420px]">
           <AssetMap assets={[asset]} freshnessOf={freshnessOf} selectedId={asset.id} focusId={asset.id} controls="none" />
-          <NavButton href={`/dashboard?asset=${asset.id}`} variant="secondary" size="sm" className="absolute right-3 top-3 z-10 h-10 px-4 shadow-md">
+          <NavButton href={`/dashboard?asset=${asset.id}`} variant="secondary" size="sm" className="absolute right-3 top-3 z-10 h-11 px-4 shadow-md">
             <MapIcon /> Open live map
           </NavButton>
         </div>
@@ -322,7 +322,7 @@ function SettingsTab({ asset, devices, onChanged }: { asset: AssetOverview; devi
                     {d.last_error ? <p className="mt-1 text-xs text-destructive">Last error: {d.last_error}</p> : null}
                   </div>
                   {ROTATABLE.includes(d.provider_key) ? (
-                    <Button variant="secondary" size="sm" className="h-9 shrink-0" disabled={pending} onClick={() => setConfirm({ rotate: d })}>
+                    <Button variant="secondary" size="sm" className="h-11 shrink-0" disabled={pending} onClick={() => setConfirm({ rotate: d })}>
                       <RotateCw className="h-3.5 w-3.5" /> New details
                     </Button>
                   ) : null}

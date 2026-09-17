@@ -18,7 +18,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
       <LoginForm next={next} />
       <p className="mt-6 text-center text-sm text-muted-foreground">
         New to Trakkka?{" "}
-        <Link href="/signup" className="font-medium text-primary hover:underline">
+        <Link href="/signup" className="inline-flex min-h-11 items-center font-medium text-primary hover:underline">
           Create an account
         </Link>
       </p>

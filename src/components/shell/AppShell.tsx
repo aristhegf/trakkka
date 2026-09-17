@@ -30,7 +30,7 @@ function activeHref(pathname: string, items: NavItem[]): string {
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <Link href="/dashboard" className={cn("flex items-center gap-2", className)} aria-label="Trakkka home">
+    <Link href="/dashboard" className={cn("flex min-h-11 items-center gap-2", className)} aria-label="Trakkka home">
       <LogoMark />
       <span className="text-[17px] font-semibold tracking-tight">Trakkka</span>
     </Link>
