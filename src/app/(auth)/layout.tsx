@@ -7,7 +7,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="flex min-h-dvh flex-col bg-background">
       <header className="flex items-center justify-between px-5 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
         <Logo />
-        <ThemeToggle variant="circle" start="top-right" className="grid h-10 w-10 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground" />
+        <ThemeToggle variant="circle" start="top-right" className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground" />
       </header>
       <main className="flex flex-1 items-center justify-center px-5 py-10">
         <div className="w-full max-w-sm">

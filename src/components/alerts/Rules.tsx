@@ -90,7 +90,7 @@ export function AlertRules({ assetId, rules, description }: { assetId: string | 
                     {!r.is_active ? " · paused" : ""}
                   </p>
                 </div>
-                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" aria-label={`Delete ${RULE_LABEL[r.rule_type] ?? r.rule_type} rule`} disabled={pending} onClick={() => guard(() => deleteAlertRule(r.id), "Rule deleted")}>
+                <Button variant="ghost" size="icon" className="h-11 w-11 rounded-full" aria-label={`Delete ${RULE_LABEL[r.rule_type] ?? r.rule_type} rule`} disabled={pending} onClick={() => guard(() => deleteAlertRule(r.id), "Rule deleted")}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </li>

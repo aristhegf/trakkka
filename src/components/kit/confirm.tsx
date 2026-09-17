@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MorphingModal } from "@/components/motion/morphing-modal";
 import { Button } from "@/components/motion/button/base";
 import { Input } from "@/components/motion/input";
+import { useBackToClose } from "./back";
 
 /**
  * Confirmation for destructive actions (beui Morphing Modal). With `requireText`, the user must type the word to
@@ -30,6 +31,10 @@ export function ConfirmDialog({
 }) {
   const [typed, setTyped] = useState("");
   const ready = !requireText || typed.trim() === requireText;
+  useBackToClose(open, () => {
+    setTyped("");
+    onClose();
+  });
   return (
     <MorphingModal
       viewId={open ? "confirm" : null}

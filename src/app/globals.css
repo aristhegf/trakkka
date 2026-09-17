@@ -189,3 +189,13 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* beui switches are 28px tall; extend the invisible hit area to 44px so they are easy to tap on phones. */
+button[role="switch"] {
+  position: relative;
+}
+button[role="switch"]::after {
+  content: "";
+  position: absolute;
+  inset: -8px -4px;
+}

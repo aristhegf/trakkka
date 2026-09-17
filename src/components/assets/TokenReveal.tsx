@@ -24,7 +24,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <div className="mt-1 flex items-center gap-2">
         <code className="min-w-0 flex-1 select-all break-all font-mono text-sm">{value}</code>
-        <Button type="button" size="sm" variant="secondary" onClick={copy} aria-label={`Copy ${label}`} className="h-10 shrink-0 px-3.5">
+        <Button type="button" size="sm" variant="secondary" onClick={copy} aria-label={`Copy ${label}`} className="h-11 shrink-0 px-3.5">
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied ? "Copied" : "Copy"}
         </Button>

@@ -1,7 +1,8 @@
 "use client";
 
 import { startTransition, useActionState, useEffect, useState } from "react";
-import { Lock, Monitor, Moon, Sun, Trash2, User } from "lucide-react";
+import { ChevronRight, Lock, LogOut, Monitor, Moon, ShieldCheck, Sun, Trash2, User } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/motion/button/base";
 import { Input } from "@/components/motion/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/motion/tabs";
@@ -13,7 +14,7 @@ import { useActionToast } from "@/components/kit/toast";
 import { useThemeChoice } from "@/components/kit/theme";
 import { updateProfile, type ActionResult } from "@/lib/settings/actions";
 import { updateNotificationPreferences } from "@/lib/alerts/actions";
-import { deleteAccount, updatePassword } from "@/lib/auth/actions";
+import { deleteAccount, signOut, updatePassword } from "@/lib/auth/actions";
 import { relativeTime } from "@/lib/format";
 import { useAssetStore } from "@/components/store/AssetStore";
 
@@ -39,7 +40,7 @@ function useResultToast(result: ActionResult | undefined, success?: string) {
   }, [result]);
 }
 
-export function SettingsView({ email, displayName, timezone, emailAlerts, hasPassword, audit }: { email: string; displayName: string; timezone: string; emailAlerts: boolean; hasPassword: boolean; audit: AuditRow[] }) {
+export function SettingsView({ email, displayName, timezone, emailAlerts, hasPassword, audit, isAdmin }: { email: string; displayName: string; timezone: string; emailAlerts: boolean; hasPassword: boolean; audit: AuditRow[]; isAdmin: boolean }) {
   const { choice, setChoice } = useThemeChoice();
   const { now } = useAssetStore();
   const [profile, profileAction, profilePending] = useActionState<ActionResult | undefined, FormData>(updateProfile, undefined);
@@ -66,7 +67,7 @@ export function SettingsView({ email, displayName, timezone, emailAlerts, hasPas
                 { v: "dark", label: "Dark", icon: <Moon className="h-4 w-4" /> },
                 { v: "system", label: "Auto", icon: <Monitor className="h-4 w-4" /> },
               ].map((t) => (
-                <TabsTrigger key={t.v} value={t.v} className="h-10 w-full gap-1.5">
+                <TabsTrigger key={t.v} value={t.v} className="h-11 w-full gap-1.5">
                   {t.icon} {t.label}
                 </TabsTrigger>
               ))}
@@ -132,6 +133,26 @@ export function SettingsView({ email, displayName, timezone, emailAlerts, hasPas
               ]}
             />
           )}
+        </Section>
+
+        <Section title="Account">
+          <div className="flex items-center gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted text-sm font-semibold uppercase">{(displayName || email).charAt(0)}</span>
+            <div className="min-w-0">
+              {displayName ? <p className="truncate text-sm font-medium">{displayName}</p> : null}
+              <p className="truncate text-sm text-muted-foreground">{email}</p>
+            </div>
+          </div>
+          {isAdmin ? (
+            <Link href="/admin" className="mt-3 flex min-h-11 items-center gap-3 rounded-2xl bg-muted/60 px-4 text-sm font-medium hover:bg-muted">
+              <ShieldCheck className="h-4 w-4 text-muted-foreground" /> Admin <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
+            </Link>
+          ) : null}
+          <form action={signOut} className="mt-3">
+            <Button type="submit" variant="secondary" className="h-11 w-full">
+              <LogOut className="h-4 w-4" /> Sign out
+            </Button>
+          </form>
         </Section>
 
         <Section title="Delete account" className="border-destructive/30" description="Removes your account, every asset, all location history, places, alerts and photos. This cannot be undone.">

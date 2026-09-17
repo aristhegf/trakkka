@@ -12,6 +12,8 @@ import { Tooltip } from "@/components/motion/tooltip";
 import { EmptyState, PageHeader, Section } from "@/components/kit/page";
 import { ConfirmDialog } from "@/components/kit/confirm";
 import { useActionToast } from "@/components/kit/toast";
+import { useBackToClose } from "@/components/kit/back";
+import { useIsPhone } from "@/components/kit/media";
 import { AssetIcon } from "@/components/assets/AssetIcon";
 import { relativeTime, formatDuration, formatDistance } from "@/lib/format";
 import { proximity } from "@/lib/geo";
@@ -36,6 +38,9 @@ export function GeofencesView({ homeGeofenceId, events }: { homeGeofenceId: stri
   const [editing, setEditing] = useState<Draft | null>(null);
   const [deleting, setDeleting] = useState<Geofence | null>(null);
   const report = useActionToast();
+  const isPhone = useIsPhone();
+  // On phones the editor is full screen, so Back should close it rather than leave Places.
+  useBackToClose(isPhone && editing !== null, () => setEditing(null));
   const assetName = useMemo(() => Object.fromEntries(assetList.map((a) => [a.id, a.name])), [assetList]);
   const fenceName = useMemo(() => Object.fromEntries(geofences.map((g) => [g.id, g.name])), [geofences]);
 
@@ -86,7 +91,7 @@ export function GeofencesView({ homeGeofenceId, events }: { homeGeofenceId: stri
             title="Places"
             description="Save the places that matter. See who is there now and get an alert when something arrives or leaves."
             actions={
-              <Button onClick={newPlace} className="max-md:h-10 max-md:px-4">
+              <Button onClick={newPlace} className="max-md:h-11 max-md:px-4">
                 <Plus className="h-4 w-4" /> Add
               </Button>
             }
@@ -131,12 +136,12 @@ export function GeofencesView({ homeGeofenceId, events }: { homeGeofenceId: stri
                       </div>
                       <div className="flex shrink-0">
                         <Tooltip content="Edit">
-                          <button type="button" onClick={() => startEdit(g)} className="grid h-10 w-10 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`Edit ${g.name}`}>
+                          <button type="button" onClick={() => startEdit(g)} className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`Edit ${g.name}`}>
                             <Pencil className="h-4 w-4" />
                           </button>
                         </Tooltip>
                         <Tooltip content="Delete">
-                          <button type="button" disabled={pending} onClick={() => setDeleting(g)} className="grid h-10 w-10 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Delete ${g.name}`}>
+                          <button type="button" disabled={pending} onClick={() => setDeleting(g)} className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Delete ${g.name}`}>
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </Tooltip>
@@ -179,7 +184,7 @@ export function GeofencesView({ homeGeofenceId, events }: { homeGeofenceId: stri
                     )}
 
                     {!isHome ? (
-                      <Button variant="ghost" size="sm" className="-ml-2 mt-2 h-9" disabled={pending} onClick={() => run(() => setHomeGeofence(g.id), `${g.name} is now Home`)}>
+                      <Button variant="ghost" size="sm" className="-ml-2 mt-2 h-11" disabled={pending} onClick={() => run(() => setHomeGeofence(g.id), `${g.name} is now Home`)}>
                         <Home className="h-3.5 w-3.5" /> Make this Home
                       </Button>
                     ) : null}

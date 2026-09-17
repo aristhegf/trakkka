@@ -57,7 +57,7 @@ export function AlertsView({ history, rules }: { history: Alert[]; rules: RuleRo
         description="Arrivals and departures, low battery, speeding, and trackers that stop reporting."
         actions={
           open.length > 0 ? (
-            <Button variant="secondary" className="max-md:h-10 max-md:px-4" disabled={pending} onClick={() => ack(() => acknowledgeAllAlerts(), "All alerts marked as seen")}>
+            <Button variant="secondary" className="max-md:h-11 max-md:px-4" disabled={pending} onClick={() => ack(() => acknowledgeAllAlerts(), "All alerts marked as seen")}>
               <CheckCheck className="h-4 w-4" /> <span className="sm:hidden">All seen</span>
               <span className="max-sm:hidden">Mark all as seen</span>
             </Button>
@@ -69,10 +69,10 @@ export function AlertsView({ history, rules }: { history: Alert[]; rules: RuleRo
         <div className="min-w-0">
           <Tabs value={filter} onValueChange={(v) => setFilter(v as "open" | "all")} variant="pill" className="mb-3">
             <TabsList className="border border-border">
-              <TabsTrigger value="open" className="h-9">
+              <TabsTrigger value="open" className="h-11">
                 Needs a look{open.length > 0 ? ` · ${open.length}` : ""}
               </TabsTrigger>
-              <TabsTrigger value="all" className="h-9">
+              <TabsTrigger value="all" className="h-11">
                 All
               </TabsTrigger>
             </TabsList>
