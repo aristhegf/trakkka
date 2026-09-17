@@ -3,20 +3,19 @@
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Box, Car, ChevronUp, PawPrint, Plus, Search, Smartphone } from "lucide-react";
+import { ChevronUp, Plus, Search, Smartphone } from "lucide-react";
 import { useAssetStore } from "@/components/store/AssetStore";
 import { AssetMap } from "@/components/map/AssetMap";
 import { AssetRow } from "./AssetRow";
 import { AssetSummary } from "./AssetSummary";
 import { BottomSheet } from "@/components/motion/bottom-sheet";
-import { MorphingSearch, type MorphingSearchItem } from "@/components/motion/morphing-search";
 import { Tabs, TabsList, TabsTrigger } from "@/components/motion/tabs";
 import { Input } from "@/components/motion/input";
 import { AnimatedNumber } from "@/components/motion/animated-number";
 import { EmptyState } from "@/components/kit/page";
-import { LogoMark } from "@/components/shell/AppShell";
 import { useIsPhone } from "@/components/kit/media";
 import { useBackToClose } from "@/components/kit/back";
+import { ConnectionBanner } from "@/components/kit/connection";
 import { describeWhere } from "@/lib/describe";
 import type { AssetOverview, Freshness } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -30,8 +29,6 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "pet", label: "Pets" },
   { key: "vehicle", label: "Vehicles" },
 ];
-
-const TYPE_ICON = { pet: PawPrint, vehicle: Car, device: Smartphone, other: Box } as const;
 
 /** Lower sorts first: problems, then live, then older, then never located. */
 function rank(a: AssetOverview, f: Freshness): number {
@@ -53,6 +50,8 @@ export function Dashboard() {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [listOpen, setListOpen] = useState(false);
+  // Opened from the search pill: focus the search field so the keyboard comes up straight away.
+  const [searchFocus, setSearchFocus] = useState(false);
   const isPhone = useIsPhone();
 
   if (assetParam !== prevParam) {
@@ -98,25 +97,16 @@ export function Dashboard() {
     });
   }, [sorted, filter, query, freshnessOf, geofences]);
 
-  const searchItems = useMemo<MorphingSearchItem[]>(
-    () =>
-      sorted.map((a) => ({
-        id: a.id,
-        title: a.name,
-        description: describeWhere(a, geofences).title,
-        icon: TYPE_ICON[a.type],
-        keywords: [a.type, a.place_label ?? ""],
-        onSelect: () => select(a.id),
-      })),
-    [sorted, geofences, select],
-  );
-
   const selected = selectedId ? assetList.find((a) => a.id === selectedId) ?? null : null;
 
   // Phone: Back closes the open sheet instead of leaving the map. Desktop panels are not overlays.
   useBackToClose(isPhone && listOpen, () => setListOpen(false));
   useBackToClose(isPhone && Boolean(selected), () => select(null, false));
   const summaryLine = counts.total === 0 ? "No assets yet" : `${counts.live} of ${counts.total} reporting${counts.moving ? ` · ${counts.moving} moving` : ""}`;
+  const openList = (withSearch: boolean) => {
+    setSearchFocus(withSearch);
+    setListOpen(true);
+  };
 
   const list = (
     <div className="space-y-1">
@@ -196,9 +186,9 @@ export function Dashboard() {
           focusId={focusId}
           controls="full"
           className="map-under-nav"
-          controlsClassName="max-md:top-auto max-md:bottom-[calc(21rem+env(safe-area-inset-bottom))]"
+          controlsClassName="max-md:top-auto max-md:bottom-[calc(10.5rem+env(safe-area-inset-bottom))]"
           // Keep the asset visible above the phone card/sheet, or left of the desktop panel.
-          fitPadding={isPhone ? { top: 60, bottom: selected ? 440 : 250 } : { right: selected ? 400 : 0 }}
+          fitPadding={isPhone ? { top: 60, bottom: selected ? 440 : 110 } : { right: selected ? 400 : 0 }}
         />
 
         {/* Desktop: selected asset panel */}
@@ -208,35 +198,43 @@ export function Dashboard() {
           </div>
         ) : null}
 
-        {/* ---------- Phone overlays ---------- */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] md:hidden">
-          <div className="pointer-events-auto flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl border border-border bg-card/95 px-3 py-2 shadow-lg backdrop-blur">
-            <LogoMark className="h-8 w-8 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight">Trakkka</p>
-              <p className="truncate text-xs text-muted-foreground">{summaryLine}</p>
-            </div>
+        {/* ---------- Phone overlays: a search pill + Add on top, a one-line summary above the tab bar. ---------- */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 space-y-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] md:hidden">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openList(true)}
+              className="pointer-events-auto flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-border bg-card/95 px-4 text-left shadow-lg backdrop-blur active:bg-muted"
+            >
+              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="truncate text-[15px] text-muted-foreground">Search assets or places</span>
+            </button>
+            <Link href="/assets/new" aria-label="Add asset" className="pointer-events-auto grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95">
+              <Plus className="h-5 w-5" />
+            </Link>
           </div>
-          <MorphingSearch iconOnly items={searchItems} placeholder="Find an asset" emptyMessage="No asset with that name" className="pointer-events-auto" />
+          <ConnectionBanner className="pointer-events-auto" />
         </div>
 
         <div className="pointer-events-none absolute inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-10 px-3 md:hidden">
-          <div className="pointer-events-auto rounded-3xl border border-border bg-card/95 p-2 shadow-xl backdrop-blur">
-            <button type="button" onClick={() => setListOpen(true)} className="flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left active:bg-muted">
-              <span>
-                <span className="block text-[15px] font-semibold">Your assets</span>
-                <span className="block text-xs text-muted-foreground">{counts.attention > 0 ? `${counts.attention} need${counts.attention === 1 ? "s" : ""} attention` : "Tap one to see where it is"}</span>
+          <button
+            type="button"
+            onClick={() => openList(false)}
+            className="pointer-events-auto flex h-14 w-full items-center gap-3 rounded-full border border-border bg-card/95 pl-4 pr-3 text-left shadow-xl backdrop-blur active:bg-muted"
+          >
+            <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", counts.attention > 0 ? "bg-destructive" : counts.live > 0 ? "bg-fresh-live" : "bg-fresh-unknown")} aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] font-semibold leading-tight">
+                {counts.total} {counts.total === 1 ? "asset" : "assets"}
               </span>
-              <span className="flex items-center gap-1 text-sm font-medium text-primary">
-                All {counts.total} <ChevronUp className="h-4 w-4" />
+              <span className={cn("block truncate text-xs leading-tight", counts.attention > 0 ? "text-destructive" : "text-muted-foreground")}>
+                {counts.attention > 0 ? `${counts.attention} need${counts.attention === 1 ? "s" : ""} attention` : summaryLine}
               </span>
-            </button>
-            <div className="mt-1">
-              {sorted.slice(0, 2).map((a) => (
-                <AssetRow key={a.id} asset={a} freshness={freshnessOf(a)} places={geofences} now={now} onClick={() => select(a.id)} />
-              ))}
-            </div>
-          </div>
+            </span>
+            <span className="flex shrink-0 items-center gap-1 text-sm font-medium text-primary">
+              List <ChevronUp className="h-4 w-4" />
+            </span>
+          </button>
         </div>
       </div>
 
@@ -245,7 +243,7 @@ export function Dashboard() {
         <BottomSheet open={listOpen} onOpenChange={setListOpen} snapPoints={[0.7, 0.94]} title="Your assets" description={summaryLine}>
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Input leftIcon={<Search />} placeholder="Search by name or place" value={query} onChange={setQuery} aria-label="Search assets" className="flex-1" />
+              <Input leftIcon={<Search />} placeholder="Search by name or place" value={query} onChange={setQuery} aria-label="Search assets" className="flex-1" autoFocus={searchFocus} enterKeyHint="search" />
               <Link href="/assets/new" aria-label="Add asset" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
                 <Plus className="h-5 w-5" />
               </Link>

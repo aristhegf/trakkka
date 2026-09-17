@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import type { Alert, AssetOverview, AssetStateRecord, Geofence, TrackingProviderRow } from "@/lib/types";
 import { deriveFreshness, thresholdsFrom } from "@/lib/freshness";
@@ -11,6 +12,8 @@ interface State {
   geofences: Geofence[];
   providers: Record<string, TrackingProviderRow>;
   connected: boolean;
+  /** When `connected` last changed (ms). Lets the UI wait a few seconds before warning about a dropped connection. */
+  connectionChangedAt: number;
   lastEventAt: number | null;
 }
 
@@ -18,7 +21,7 @@ type Action =
   | { type: "state"; record: AssetStateRecord }
   | { type: "alert"; alert: Alert }
   | { type: "geofence_asset"; geofenceId: string; assetId: string; isInside: boolean | null; at: string | null }
-  | { type: "connected"; value: boolean }
+  | { type: "connected"; value: boolean; at: number }
   | { type: "reset"; assets: AssetOverview[]; alerts: Alert[]; geofences: Geofence[] };
 
 function reducer(state: State, action: Action): State {
@@ -77,7 +80,7 @@ function reducer(state: State, action: Action): State {
         ),
       };
     case "connected":
-      return { ...state, connected: action.value };
+      return action.value === state.connected ? state : { ...state, connected: action.value, connectionChangedAt: action.at };
     case "reset":
       return {
         ...state,
@@ -97,7 +100,25 @@ interface AssetStoreValue extends State {
   assetList: AssetOverview[];
   freshnessOf: (a: AssetOverview) => ReturnType<typeof deriveFreshness>;
   refresh: () => Promise<void>;
+  /** Drop and re-open the realtime channel, then reload the snapshot. */
+  reconnect: () => void;
+  /** Browser network status. */
+  online: boolean;
 }
+
+const subscribeOnline = (cb: () => void) => {
+  window.addEventListener("online", cb);
+  window.addEventListener("offline", cb);
+  return () => {
+    window.removeEventListener("online", cb);
+    window.removeEventListener("offline", cb);
+  };
+};
+
+/** Minimum gap between automatic snapshot reloads when the app comes back to the foreground. */
+const RESUME_REFRESH_MIN_MS = 10_000;
+/** After this long in the background, assume a phone suspended the socket even if it still reports "joined". */
+const RESUME_RECONNECT_AFTER_MS = 60_000;
 
 const Ctx = createContext<AssetStoreValue | null>(null);
 
@@ -127,6 +148,7 @@ export function AssetStoreProvider({
     geofences: initialGeofences,
     providers: Object.fromEntries(providers.map((p) => [p.key, p])),
     connected: false,
+    connectionChangedAt: initialNow,
     lastEventAt: null,
   }));
   const [now, setNow] = useState(() => new Date(initialNow));
@@ -156,7 +178,13 @@ export function AssetStoreProvider({
     };
   }, []);
 
+  const lastRefreshRef = useRef(0);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const [channelKey, setChannelKey] = useState(0);
+  const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
+
   const refresh = useCallback(async () => {
+    lastRefreshRef.current = Date.now();
     const [{ data: assets }, { data: alerts }, { data: geofences }] = await Promise.all([
       supabase.from("asset_overview").select("*").order("name"),
       supabase.from("alerts").select("*").is("resolved_at", null).order("triggered_at", { ascending: false }).limit(100),
@@ -187,14 +215,47 @@ export function AssetStoreProvider({
         if (rec) dispatch({ type: "geofence_asset", geofenceId: rec.geofence_id, assetId: rec.asset_id, isInside: rec.is_inside, at: rec.last_transition_at });
       })
       .subscribe((status) => {
-        dispatch({ type: "connected", value: status === "SUBSCRIBED" });
+        dispatch({ type: "connected", value: status === "SUBSCRIBED", at: Date.now() });
         // After a reconnect we may have missed events; reload the snapshot.
         if (status === "SUBSCRIBED") void refresh();
       });
+    channelRef.current = channel;
     return () => {
+      channelRef.current = null;
       void supabase.removeChannel(channel);
     };
-  }, [supabase, userId, refresh]);
+  }, [supabase, userId, refresh, channelKey]);
+
+  const reconnect = useCallback(() => {
+    // A new key re-runs the channel effect: the old channel is removed and a fresh one subscribes (and refreshes).
+    setChannelKey((k) => k + 1);
+  }, []);
+
+  // Phones suspend background tabs and their sockets. When Trakkka returns to the foreground or the network comes
+  // back, reload the snapshot, and reopen the channel if it is not joined or the app was away for a while.
+  useEffect(() => {
+    let hiddenAt: number | null = document.visibilityState === "hidden" ? Date.now() : null;
+    const resume = () => {
+      const away = hiddenAt ? Date.now() - hiddenAt : 0;
+      hiddenAt = null;
+      const joined = channelRef.current?.state === "joined";
+      if (!joined || away > RESUME_RECONNECT_AFTER_MS) {
+        reconnect();
+        return; // the new subscription refreshes once it is joined
+      }
+      if (Date.now() - lastRefreshRef.current > RESUME_REFRESH_MIN_MS) void refresh();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") hiddenAt = Date.now();
+      else resume();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("online", resume);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("online", resume);
+    };
+  }, [refresh, reconnect]);
 
   const value = useMemo<AssetStoreValue>(() => {
     const assetList = Object.values(state.assets).sort((a, b) => a.name.localeCompare(b.name));
@@ -205,8 +266,10 @@ export function AssetStoreProvider({
       assetList,
       freshnessOf: (a) => deriveFreshness(a.last_location_at, a.connection_status, thresholdsFrom(a), now),
       refresh,
+      reconnect,
+      online,
     };
-  }, [state, now, timezone, refresh]);
+  }, [state, now, timezone, refresh, reconnect, online]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
