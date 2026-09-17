@@ -9,6 +9,7 @@ import { Tooltip } from "@/components/motion/tooltip";
 import { useAssetStore } from "@/components/store/AssetStore";
 import { signOut } from "@/lib/auth/actions";
 import { cn } from "@/lib/utils";
+import { ConnectionBanner } from "@/components/kit/connection";
 
 interface NavItem {
   href: string;
@@ -93,6 +94,8 @@ export function AppShell({ children, isAdmin, displayName }: { children: React.R
         </div>
       </header>
 
+      {/* Phone: warn when locations may be stale. The map shows its own banner under the search pill. */}
+      {!onMap ? <ConnectionBanner className="mx-3 mt-[max(0.5rem,env(safe-area-inset-top))] shrink-0 md:hidden" /> : null}
       <main className="relative min-h-0 flex-1">{children}</main>
 
       {/* Phone bottom navigation: beui pill tabs, icon over label, 48px touch targets. Floats over the map. */}
